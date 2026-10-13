@@ -13,6 +13,18 @@ CREATE TABLE IF NOT EXISTS assets (
     asset_type_id INTEGER REFERENCES asset_types(id),
     name TEXT,
     voltage_kv NUMERIC,
+    region TEXT,
+    county TEXT,
+    branch TEXT,
+    feeder TEXT,
+    origin_area TEXT,
+    asset_structure TEXT,
+    dcs_category TEXT,
+    installation_environment TEXT,
+    isolation_type TEXT,
+    road_name TEXT,
+    street_name TEXT,
+    location_description TEXT,
     status TEXT NOT NULL DEFAULT 'unknown',
     condition TEXT NOT NULL DEFAULT 'unknown',
     maintenance_priority TEXT NOT NULL DEFAULT 'unassigned',
@@ -26,6 +38,9 @@ CREATE TABLE IF NOT EXISTS assets (
 
 CREATE INDEX IF NOT EXISTS assets_geom_gix ON assets USING GIST (geom);
 CREATE INDEX IF NOT EXISTS assets_type_idx ON assets (asset_type_id);
+CREATE INDEX IF NOT EXISTS assets_county_idx ON assets (county);
+CREATE INDEX IF NOT EXISTS assets_branch_idx ON assets (branch);
+CREATE INDEX IF NOT EXISTS assets_feeder_idx ON assets (feeder);
 
 CREATE TABLE IF NOT EXISTS network_lines (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
