@@ -181,9 +181,33 @@ def profile(gdf: gpd.GeoDataFrame) -> None:
     if not gdf.empty:
         minx, miny, maxx, maxy = gdf.total_bounds
         print(
-            "Bounds: "
+            "Source CRS bounds: "
+            f"{minx:.5f}, {miny:.5f}, {maxx:.5f}, {maxy:.5f}"
+        )
+
+        wgs84 = gdf.to_crs(4326) if gdf.crs else gdf.set_crs(4326)
+        minx, miny, maxx, maxy = wgs84.total_bounds
+        print(
+            "WGS84 bounds: "
             f"lon {minx:.5f} to {maxx:.5f}, "
             f"lat {miny:.5f} to {maxy:.5f}"
+        )
+
+    print("\n=== Attribute summary ===")
+    for column in gdf.columns:
+        if column == "geometry":
+            continue
+
+        series = gdf[column]
+        non_null = int(series.notna().sum())
+        unique = int(series.nunique(dropna=True))
+        samples = [
+            str(value)
+            for value in series.dropna().astype(str).drop_duplicates().head(5).tolist()
+        ]
+        print(
+            f"{column}: non-null={non_null:,}, unique={unique:,}, "
+            f"samples={samples}"
         )
 
 
