@@ -58,9 +58,9 @@ ID_CANDIDATES = (
     "id",
 )
 NAME_CANDIDATES = (
-    "Modifyin25",
-    "OBJECTID",
-    "FID",
+    "name",
+    "Name",
+    "NAME",
 )
 VOLTAGE_CANDIDATES = (
     "voltage_kv",
@@ -73,8 +73,9 @@ VOLTAGE_CANDIDATES = (
 
 FIELD_MAP = {
     "region": "RCC1",
-    "county": "County2",
+    "service_area": "County2",
     "branch": "Branch3",
+    "asset_reference": "Modifyin25",
     "feeder": "Feeder_028",
     "origin_area": "Origin_027",
     "asset_structure": "Substati9",
@@ -323,8 +324,9 @@ def load_records(records: list[dict[str, Any]], replace: bool) -> None:
                 condition,
                 maintenance_priority,
                 region,
-                county,
+                service_area,
                 branch,
+                asset_reference,
                 feeder,
                 origin_area,
                 asset_structure,
@@ -348,8 +350,9 @@ def load_records(records: list[dict[str, Any]], replace: bool) -> None:
                 'unknown',
                 'unassigned',
                 :region,
-                :county,
+                :service_area,
                 :branch,
+                :asset_reference,
                 :feeder,
                 :origin_area,
                 :asset_structure,
