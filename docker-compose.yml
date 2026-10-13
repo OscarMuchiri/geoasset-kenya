@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: geoasset-postgis
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-geoasset}
+      POSTGRES_USER: ${POSTGRES_USER:-geoasset}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-geoasset_dev}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - geoasset_pgdata:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-geoasset} -d ${POSTGRES_DB:-geoasset}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  geoasset_pgdata:
