@@ -14,8 +14,9 @@ CREATE TABLE IF NOT EXISTS assets (
     name TEXT,
     voltage_kv NUMERIC,
     region TEXT,
-    county TEXT,
+    service_area TEXT,
     branch TEXT,
+    asset_reference TEXT,
     feeder TEXT,
     origin_area TEXT,
     asset_structure TEXT,
@@ -38,7 +39,7 @@ CREATE TABLE IF NOT EXISTS assets (
 
 CREATE INDEX IF NOT EXISTS assets_geom_gix ON assets USING GIST (geom);
 CREATE INDEX IF NOT EXISTS assets_type_idx ON assets (asset_type_id);
-CREATE INDEX IF NOT EXISTS assets_county_idx ON assets (county);
+CREATE INDEX IF NOT EXISTS assets_service_area_idx ON assets (service_area);
 CREATE INDEX IF NOT EXISTS assets_branch_idx ON assets (branch);
 CREATE INDEX IF NOT EXISTS assets_feeder_idx ON assets (feeder);
 
