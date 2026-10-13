@@ -1,0 +1,1 @@
+"""GeoAsset Kenya API routes."""
