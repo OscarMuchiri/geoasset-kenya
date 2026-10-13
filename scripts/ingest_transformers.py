@@ -58,13 +58,9 @@ ID_CANDIDATES = (
     "id",
 )
 NAME_CANDIDATES = (
-    "name",
-    "Name",
-    "NAME",
-    "station",
-    "Station",
-    "transformer",
-    "Transformer",
+    "Modifyin25",
+    "OBJECTID",
+    "FID",
 )
 VOLTAGE_CANDIDATES = (
     "voltage_kv",
@@ -74,6 +70,21 @@ VOLTAGE_CANDIDATES = (
     "KV",
     "kV",
 )
+
+FIELD_MAP = {
+    "region": "RCC1",
+    "county": "County2",
+    "branch": "Branch3",
+    "feeder": "Feeder_028",
+    "origin_area": "Origin_027",
+    "asset_structure": "Substati9",
+    "dcs_category": "DCS_Cate15",
+    "installation_environment": "Substati29",
+    "isolation_type": "HT_Isola32",
+    "road_name": "Road",
+    "street_name": "Road_Str38",
+    "location_description": "Physical39",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -232,6 +243,11 @@ def normalize(gdf: gpd.GeoDataFrame) -> list[dict[str, Any]]:
             if key != "geometry"
         }
 
+        normalized_fields = {
+            target: _string_or_none(properties.get(source))
+            for target, source in FIELD_MAP.items()
+        }
+
         records.append(
             {
                 "source_id": make_source_id(
@@ -239,6 +255,7 @@ def normalize(gdf: gpd.GeoDataFrame) -> list[dict[str, Any]]:
                 ),
                 "name": _string_or_none(first_value(properties, NAME_CANDIDATES)),
                 "voltage_kv": as_float(first_value(properties, VOLTAGE_CANDIDATES)),
+                **normalized_fields,
                 "source_properties": properties,
                 "longitude": float(point.x),
                 "latitude": float(point.y),
@@ -305,6 +322,18 @@ def load_records(records: list[dict[str, Any]], replace: bool) -> None:
                 status,
                 condition,
                 maintenance_priority,
+                region,
+                county,
+                branch,
+                feeder,
+                origin_area,
+                asset_structure,
+                dcs_category,
+                installation_environment,
+                isolation_type,
+                road_name,
+                street_name,
+                location_description,
                 source_name,
                 source_license,
                 source_properties,
@@ -318,6 +347,18 @@ def load_records(records: list[dict[str, Any]], replace: bool) -> None:
                 'unknown',
                 'unknown',
                 'unassigned',
+                :region,
+                :county,
+                :branch,
+                :feeder,
+                :origin_area,
+                :asset_structure,
+                :dcs_category,
+                :installation_environment,
+                :isolation_type,
+                :road_name,
+                :street_name,
+                :location_description,
                 :source_name,
                 :source_license,
                 CAST(:source_properties AS jsonb),
