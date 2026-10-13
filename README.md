@@ -87,9 +87,9 @@ geoasset-kenya/
 - [x] Core public data sources verified
 - [x] Initial PostGIS schema designed
 - [ ] Download and profile source datasets
-- [ ] Build repeatable ingestion pipeline
+- [x] Build repeatable ingestion pipeline
 - [ ] Load transformer, substation and network layers into PostGIS
-- [ ] Build FastAPI asset endpoints
+- [x] Build FastAPI asset endpoints
 - [ ] Build interactive MapLibre interface
 - [ ] Add inspection and maintenance workflows
 - [ ] Add analytics and spatial-query tools
