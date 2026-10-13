@@ -32,6 +32,10 @@ import requests
 from sqlalchemy import create_engine, text
 
 
+RESOURCE_PAGE = (
+    "https://energydata.info/dataset/kenya-distribution-transformers/resource/"
+    "8d319200-e0c2-402d-96c0-d5ee4dfa8d3c"
+)
 SOURCE_URL = (
     "https://energydata.info/dataset/"
     "84ca7288-1d10-469d-a98d-26643f869367/resource/"
@@ -96,12 +100,43 @@ def parse_args() -> argparse.Namespace:
 def download_source(destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     print(f"Downloading {SOURCE_URL}")
-    with requests.get(SOURCE_URL, stream=True, timeout=180) as response:
-        response.raise_for_status()
-        with destination.open("wb") as file_handle:
-            for chunk in response.iter_content(chunk_size=1024 * 1024):
-                if chunk:
-                    file_handle.write(chunk)
+
+    # ENERGYDATA.INFO can reject Python's default requests user-agent with HTTP
+    # 403 even though the public resource downloads normally in a browser.
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/131.0 Safari/537.36"
+        ),
+        "Accept": "application/geo+json,application/json,text/plain,*/*",
+        "Referer": RESOURCE_PAGE,
+    }
+
+    try:
+        with requests.get(
+            SOURCE_URL,
+            headers=headers,
+            stream=True,
+            timeout=180,
+            allow_redirects=True,
+        ) as response:
+            response.raise_for_status()
+            with destination.open("wb") as file_handle:
+                for chunk in response.iter_content(chunk_size=1024 * 1024):
+                    if chunk:
+                        file_handle.write(chunk)
+    except requests.HTTPError as exc:
+        if exc.response is not None and exc.response.status_code == 403:
+            raise RuntimeError(
+                "\nENERGYDATA.INFO blocked the automated download (HTTP 403).\n"
+                "Open the public resource page in your browser, click Download, "
+                f"and save the file as:\n  {destination}\n"
+                "Then rerun this script WITHOUT --download.\n"
+                f"Resource page: {RESOURCE_PAGE}"
+            ) from exc
+        raise
+
     print(f"Saved source dataset to {destination}")
 
 
