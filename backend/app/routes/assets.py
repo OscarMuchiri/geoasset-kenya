@@ -18,6 +18,18 @@ SELECT
     at.name AS asset_type_name,
     a.name,
     a.voltage_kv,
+    a.region,
+    a.county,
+    a.branch,
+    a.feeder,
+    a.origin_area,
+    a.asset_structure,
+    a.dcs_category,
+    a.installation_environment,
+    a.isolation_type,
+    a.road_name,
+    a.street_name,
+    a.location_description,
     a.status,
     a.condition,
     a.maintenance_priority,
@@ -34,6 +46,9 @@ JOIN asset_types at ON at.id = a.asset_type_id
 @router.get("")
 def list_assets(
     asset_type: str | None = None,
+    county: str | None = None,
+    branch: str | None = None,
+    feeder: str | None = None,
     min_lon: float | None = Query(None, ge=-180, le=180),
     min_lat: float | None = Query(None, ge=-90, le=90),
     max_lon: float | None = Query(None, ge=-180, le=180),
@@ -48,6 +63,18 @@ def list_assets(
     if asset_type:
         clauses.append("at.code = :asset_type")
         params["asset_type"] = asset_type
+
+    if county:
+        clauses.append("a.county = :county")
+        params["county"] = county
+
+    if branch:
+        clauses.append("a.branch = :branch")
+        params["branch"] = branch
+
+    if feeder:
+        clauses.append("a.feeder = :feeder")
+        params["feeder"] = feeder
 
     bbox_values = (min_lon, min_lat, max_lon, max_lat)
     if any(value is not None for value in bbox_values):
@@ -96,6 +123,18 @@ def list_assets(
                     "asset_type_name",
                     "name",
                     "voltage_kv",
+                    "region",
+                    "county",
+                    "branch",
+                    "feeder",
+                    "origin_area",
+                    "asset_structure",
+                    "dcs_category",
+                    "installation_environment",
+                    "isolation_type",
+                    "road_name",
+                    "street_name",
+                    "location_description",
                     "status",
                     "condition",
                     "maintenance_priority",
@@ -142,6 +181,18 @@ def get_asset(asset_id: UUID, db: Session = Depends(get_db)) -> dict:
                 "asset_type_name",
                 "name",
                 "voltage_kv",
+                "region",
+                "county",
+                "branch",
+                "feeder",
+                "origin_area",
+                "asset_structure",
+                "dcs_category",
+                "installation_environment",
+                "isolation_type",
+                "road_name",
+                "street_name",
+                "location_description",
                 "status",
                 "condition",
                 "maintenance_priority",
