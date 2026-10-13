@@ -19,8 +19,9 @@ SELECT
     a.name,
     a.voltage_kv,
     a.region,
-    a.county,
+    a.service_area,
     a.branch,
+    a.asset_reference,
     a.feeder,
     a.origin_area,
     a.asset_structure,
@@ -46,7 +47,7 @@ JOIN asset_types at ON at.id = a.asset_type_id
 @router.get("")
 def list_assets(
     asset_type: str | None = None,
-    county: str | None = None,
+    service_area: str | None = None,
     branch: str | None = None,
     feeder: str | None = None,
     min_lon: float | None = Query(None, ge=-180, le=180),
@@ -64,9 +65,9 @@ def list_assets(
         clauses.append("at.code = :asset_type")
         params["asset_type"] = asset_type
 
-    if county:
-        clauses.append("a.county = :county")
-        params["county"] = county
+    if service_area:
+        clauses.append("a.service_area = :service_area")
+        params["service_area"] = service_area
 
     if branch:
         clauses.append("a.branch = :branch")
@@ -124,8 +125,9 @@ def list_assets(
                     "name",
                     "voltage_kv",
                     "region",
-                    "county",
+                    "service_area",
                     "branch",
+                    "asset_reference",
                     "feeder",
                     "origin_area",
                     "asset_structure",
@@ -182,8 +184,9 @@ def get_asset(asset_id: UUID, db: Session = Depends(get_db)) -> dict:
                 "name",
                 "voltage_kv",
                 "region",
-                "county",
+                "service_area",
                 "branch",
+                    "asset_reference",
                 "feeder",
                 "origin_area",
                 "asset_structure",
