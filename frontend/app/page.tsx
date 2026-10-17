@@ -50,6 +50,7 @@ export default function HomePage() {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const loadAssetsRef = useRef<() => Promise<void>>(async () => {});
+  const searchQueryRef = useRef("");
 
   const [selected, setSelected] = useState<AssetFeature | null>(null);
   const [serviceArea, setServiceArea] = useState("");
@@ -152,7 +153,8 @@ export default function HomePage() {
 
   useEffect(() => {
     loadAssetsRef.current = loadAssets;
-  }, [loadAssets]);
+    searchQueryRef.current = searchQuery;
+  }, [loadAssets, searchQuery]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -339,7 +341,7 @@ export default function HomePage() {
     });
 
     map.on("moveend", () => {
-      if (!searchQuery) loadAssetsRef.current();
+      if (!searchQueryRef.current) loadAssetsRef.current();
     });
 
     map.on("click", "clusters", async (event) => {
