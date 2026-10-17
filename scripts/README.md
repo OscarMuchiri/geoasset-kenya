@@ -51,3 +51,41 @@ Then open:
 ```text
 http://localhost:8000/assets?asset_type=distribution_transformer&limit=20
 ```
+
+
+## Transmission stations
+
+Download the public GeoJSON from ENERGYDATA.INFO and save it as:
+
+```text
+data/raw/transmission_stations.geojson
+```
+
+Then inspect and load it:
+
+```bash
+python scripts/ingest_transmission_stations.py --dry-run
+python scripts/ingest_transmission_stations.py --replace
+```
+
+## Electricity network
+
+The public electricity-network dataset is split by voltage level. Save files with clear local names, for example:
+
+```text
+data/raw/network_66kv.geojson
+data/raw/network_132kv.geojson
+data/raw/network_220kv.geojson
+data/raw/network_unidentified.geojson
+```
+
+Load each class separately:
+
+```bash
+python scripts/ingest_network_lines.py --input data/raw/network_66kv.geojson --voltage 66 --replace-class
+python scripts/ingest_network_lines.py --input data/raw/network_132kv.geojson --voltage 132 --replace-class
+python scripts/ingest_network_lines.py --input data/raw/network_220kv.geojson --voltage 220 --replace-class
+python scripts/ingest_network_lines.py --input data/raw/network_unidentified.geojson --network-class unidentified --replace-class
+```
+
+The 11 kV and 33 kV layers are substantially larger and can be added after the higher-voltage layers are validated.
