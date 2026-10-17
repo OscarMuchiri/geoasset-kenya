@@ -160,6 +160,48 @@ def list_assets(
     }
 
 
+@router.get("/filter-options")
+def get_filter_options(db: Session = Depends(get_db)) -> dict:
+    service_areas = db.execute(
+        text(
+            """
+            SELECT DISTINCT service_area
+            FROM assets
+            WHERE service_area IS NOT NULL AND service_area <> ''
+            ORDER BY service_area
+            """
+        )
+    ).scalars().all()
+
+    branches = db.execute(
+        text(
+            """
+            SELECT DISTINCT branch
+            FROM assets
+            WHERE branch IS NOT NULL AND branch <> ''
+            ORDER BY branch
+            """
+        )
+    ).scalars().all()
+
+    feeders = db.execute(
+        text(
+            """
+            SELECT DISTINCT feeder
+            FROM assets
+            WHERE feeder IS NOT NULL AND feeder <> ''
+            ORDER BY feeder
+            """
+        )
+    ).scalars().all()
+
+    return {
+        "service_areas": service_areas,
+        "branches": branches,
+        "feeders": feeders,
+    }
+
+
 @router.get("/{asset_id}")
 def get_asset(asset_id: UUID, db: Session = Depends(get_db)) -> dict:
     query = text(BASE_SELECT + " WHERE a.id = :asset_id")
