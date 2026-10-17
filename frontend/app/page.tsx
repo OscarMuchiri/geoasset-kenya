@@ -1,0 +1,385 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import maplibregl, { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
+import {
+  Activity,
+  Database,
+  Filter,
+  Layers3,
+  MapPin,
+  RefreshCw,
+  X
+} from "lucide-react";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+
+type FeatureProperties = {
+  source_id?: string | null;
+  asset_type_name?: string | null;
+  service_area?: string | null;
+  branch?: string | null;
+  feeder?: string | null;
+  asset_reference?: string | null;
+  asset_structure?: string | null;
+  installation_environment?: string | null;
+  isolation_type?: string | null;
+  road_name?: string | null;
+  street_name?: string | null;
+  location_description?: string | null;
+  source_name?: string | null;
+  source_license?: string | null;
+};
+
+type AssetFeature = GeoJSON.Feature<GeoJSON.Point, FeatureProperties>;
+
+type FilterOptions = {
+  service_areas: string[];
+  branches: string[];
+  feeders: string[];
+};
+
+const emptyCollection: GeoJSON.FeatureCollection<GeoJSON.Point, FeatureProperties> = {
+  type: "FeatureCollection",
+  features: []
+};
+
+export default function HomePage() {
+  const mapContainer = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const [selected, setSelected] = useState<AssetFeature | null>(null);
+  const [serviceArea, setServiceArea] = useState("");
+  const [branch, setBranch] = useState("");
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({
+    service_areas: [],
+    branches: [],
+    feeders: []
+  });
+  const [visibleCount, setVisibleCount] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("Loading infrastructure…");
+
+  const loadAssets = useCallback(async () => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    const bounds = map.getBounds();
+    const params = new URLSearchParams({
+      asset_type: "distribution_transformer",
+      min_lon: String(bounds.getWest()),
+      min_lat: String(bounds.getSouth()),
+      max_lon: String(bounds.getEast()),
+      max_lat: String(bounds.getNorth()),
+      limit: "5000"
+    });
+
+    if (serviceArea) params.set("service_area", serviceArea);
+    if (branch) params.set("branch", branch);
+
+    setLoading(true);
+    setMessage("Loading visible assets…");
+
+    try {
+      const response = await fetch(`${API_URL}/assets?${params.toString()}`);
+      if (!response.ok) throw new Error(`API returned ${response.status}`);
+
+      const data = await response.json();
+      const source = map.getSource("transformers") as GeoJSONSource | undefined;
+      source?.setData(data);
+      setVisibleCount(data?.meta?.count ?? data?.features?.length ?? 0);
+      setMessage(
+        (data?.meta?.count ?? 0) >= 5000
+          ? "Showing first 5,000 assets in this view"
+          : "Map synchronized with PostGIS"
+      );
+    } catch (error) {
+      console.error(error);
+      setMessage("Could not reach the GeoAsset API");
+    } finally {
+      setLoading(false);
+    }
+  }, [branch, serviceArea]);
+
+  useEffect(() => {
+    fetch(`${API_URL}/assets/filter-options`)
+      .then((response) => response.json())
+      .then((data) => setFilterOptions(data))
+      .catch(() => {
+        // The map remains usable even if filter metadata cannot be loaded.
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!mapContainer.current || mapRef.current) return;
+
+    const map = new maplibregl.Map({
+      container: mapContainer.current,
+      center: [37.8, 0.25],
+      zoom: 5.8,
+      minZoom: 5,
+      maxZoom: 18,
+      style: {
+        version: 8,
+        sources: {
+          osm: {
+            type: "raster",
+            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+            tileSize: 256,
+            attribution:
+              '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          }
+        },
+        layers: [{ id: "osm", type: "raster", source: "osm" }]
+      }
+    });
+
+    mapRef.current = map;
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-right");
+
+    map.on("load", () => {
+      map.addSource("transformers", {
+        type: "geojson",
+        data: emptyCollection,
+        cluster: true,
+        clusterMaxZoom: 13,
+        clusterRadius: 46
+      });
+
+      map.addLayer({
+        id: "clusters",
+        type: "circle",
+        source: "transformers",
+        filter: ["has", "point_count"],
+        paint: {
+          "circle-color": [
+            "step",
+            ["get", "point_count"],
+            "#22d3ee",
+            100,
+            "#0ea5e9",
+            750,
+            "#2563eb"
+          ],
+          "circle-radius": [
+            "step",
+            ["get", "point_count"],
+            18,
+            100,
+            24,
+            750,
+            30
+          ],
+          "circle-opacity": 0.86,
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#dff8ff"
+        }
+      });
+
+      map.addLayer({
+        id: "cluster-count",
+        type: "symbol",
+        source: "transformers",
+        filter: ["has", "point_count"],
+        layout: {
+          "text-field": ["get", "point_count_abbreviated"],
+          "text-size": 12
+        },
+        paint: { "text-color": "#03111b" }
+      });
+
+      map.addLayer({
+        id: "transformer-points",
+        type: "circle",
+        source: "transformers",
+        filter: ["!", ["has", "point_count"]],
+        paint: {
+          "circle-radius": 5,
+          "circle-color": "#67e8f9",
+          "circle-stroke-width": 1.5,
+          "circle-stroke-color": "#082f49",
+          "circle-opacity": 0.92
+        }
+      });
+
+      loadAssets();
+    });
+
+    map.on("moveend", loadAssets);
+
+    map.on("click", "clusters", async (event) => {
+      const features = map.queryRenderedFeatures(event.point, { layers: ["clusters"] });
+      const feature = features[0];
+      const clusterId = feature?.properties?.cluster_id;
+      if (clusterId === undefined) return;
+
+      const source = map.getSource("transformers") as GeoJSONSource;
+      const zoom = await source.getClusterExpansionZoom(clusterId);
+      const coordinates = (feature.geometry as GeoJSON.Point).coordinates as [number, number];
+      map.easeTo({ center: coordinates, zoom });
+    });
+
+    map.on("click", "transformer-points", (event) => {
+      const feature = event.features?.[0] as unknown as AssetFeature | undefined;
+      if (feature) setSelected(feature);
+    });
+
+    for (const layer of ["clusters", "transformer-points"]) {
+      map.on("mouseenter", layer, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", layer, () => {
+        map.getCanvas().style.cursor = "";
+      });
+    }
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, [loadAssets]);
+
+  useEffect(() => {
+    loadAssets();
+  }, [loadAssets]);
+
+  const resetFilters = () => {
+    setServiceArea("");
+    setBranch("");
+  };
+
+  return (
+    <main className="app-shell">
+      <aside className="sidebar">
+        <div>
+          <div className="brand-row">
+            <div className="brand-mark">
+              <Layers3 size={21} />
+            </div>
+            <div>
+              <p className="eyebrow">GeoAsset Kenya</p>
+              <h1>Grid Asset Explorer</h1>
+            </div>
+          </div>
+
+          <p className="intro">
+            Explore real public electricity infrastructure data through a spatial
+            asset-management interface.
+          </p>
+
+          <div className="status-card">
+            <div className="status-icon">
+              <Activity size={17} />
+            </div>
+            <div>
+              <strong>{message}</strong>
+              <span>{visibleCount.toLocaleString()} transformer points in view</span>
+            </div>
+            {loading && <RefreshCw size={16} className="spin" />}
+          </div>
+
+          <section className="filter-section">
+            <div className="section-title">
+              <Filter size={15} />
+              <span>Map filters</span>
+            </div>
+
+            <label>
+              Service area
+              <select value={serviceArea} onChange={(e) => setServiceArea(e.target.value)}>
+                <option value="">All service areas</option>
+                {filterOptions.service_areas.map((item) => (
+                  <option value={item} key={item}>{item}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Branch
+              <select value={branch} onChange={(e) => setBranch(e.target.value)}>
+                <option value="">All branches</option>
+                {filterOptions.branches.map((item) => (
+                  <option value={item} key={item}>{item}</option>
+                ))}
+              </select>
+            </label>
+
+            <button className="secondary-button" onClick={resetFilters}>
+              Clear filters
+            </button>
+          </section>
+
+          <section className="metric-grid">
+            <div className="metric-card">
+              <Database size={16} />
+              <strong>57,360</strong>
+              <span>loaded assets</span>
+            </div>
+            <div className="metric-card">
+              <MapPin size={16} />
+              <strong>PostGIS</strong>
+              <span>spatial backend</span>
+            </div>
+          </section>
+        </div>
+
+        <div className="source-note">
+          Infrastructure source: ENERGYDATA.INFO / World Bank Group, attributed
+          on the portal to KPLC. Operational condition fields remain demo-only.
+        </div>
+      </aside>
+
+      <section className="map-panel">
+        <div ref={mapContainer} className="map" />
+
+        <div className="map-topbar">
+          <div>
+            <span className="live-dot" />
+            Distribution transformers
+          </div>
+          <span>Pan or zoom to query PostGIS</span>
+        </div>
+
+        {selected && (
+          <aside className="detail-drawer">
+            <button className="close-button" onClick={() => setSelected(null)} aria-label="Close asset details">
+              <X size={18} />
+            </button>
+
+            <p className="eyebrow">Transformer asset</p>
+            <h2>{selected.properties.asset_reference || `Asset ${selected.properties.source_id ?? ""}`}</h2>
+
+            <div className="coordinate-row">
+              {selected.geometry.coordinates[1].toFixed(5)}, {selected.geometry.coordinates[0].toFixed(5)}
+            </div>
+
+            <dl>
+              <Detail label="Service area" value={selected.properties.service_area} />
+              <Detail label="Branch" value={selected.properties.branch} />
+              <Detail label="Feeder" value={selected.properties.feeder} />
+              <Detail label="Structure" value={selected.properties.asset_structure} />
+              <Detail label="Environment" value={selected.properties.installation_environment} />
+              <Detail label="Isolation" value={selected.properties.isolation_type} />
+              <Detail label="Road" value={selected.properties.road_name || selected.properties.street_name} />
+              <Detail label="Location" value={selected.properties.location_description} />
+            </dl>
+
+            <div className="provenance">
+              <strong>Data provenance</strong>
+              <span>{selected.properties.source_name ?? "Public infrastructure dataset"}</span>
+              <span>License: {selected.properties.source_license ?? "See repository documentation"}</span>
+            </div>
+          </aside>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function Detail({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div>
+      <dt>{label}</dt>
+      <dd>{value || "Not provided"}</dd>
+    </div>
+  );
+}
