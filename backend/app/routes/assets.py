@@ -50,6 +50,7 @@ def list_assets(
     service_area: str | None = None,
     branch: str | None = None,
     feeder: str | None = None,
+    q: str | None = Query(None, min_length=2, max_length=120),
     min_lon: float | None = Query(None, ge=-180, le=180),
     min_lat: float | None = Query(None, ge=-90, le=90),
     max_lon: float | None = Query(None, ge=-180, le=180),
@@ -76,6 +77,22 @@ def list_assets(
     if feeder:
         clauses.append("a.feeder = :feeder")
         params["feeder"] = feeder
+
+    if q:
+        clauses.append(
+            """
+            (
+                a.asset_reference ILIKE :q
+                OR a.feeder ILIKE :q
+                OR a.road_name ILIKE :q
+                OR a.street_name ILIKE :q
+                OR a.location_description ILIKE :q
+                OR a.branch ILIKE :q
+                OR a.service_area ILIKE :q
+            )
+            """
+        )
+        params["q"] = f"%{q.strip()}%"
 
     bbox_values = (min_lon, min_lat, max_lon, max_lat)
     if any(value is not None for value in bbox_values):
@@ -161,7 +178,11 @@ def list_assets(
 
 
 @router.get("/filter-options")
-def get_filter_options(db: Session = Depends(get_db)) -> dict:
+def get_filter_options(
+    service_area: str | None = None,
+    branch: str | None = None,
+    db: Session = Depends(get_db),
+) -> dict:
     service_areas = db.execute(
         text(
             """
@@ -173,26 +194,43 @@ def get_filter_options(db: Session = Depends(get_db)) -> dict:
         )
     ).scalars().all()
 
+    branch_params: dict[str, object] = {}
+    branch_where = ""
+    if service_area:
+        branch_where = " AND service_area = :service_area"
+        branch_params["service_area"] = service_area
+
     branches = db.execute(
         text(
             """
             SELECT DISTINCT branch
             FROM assets
             WHERE branch IS NOT NULL AND branch <> ''
+            """ + branch_where + """
             ORDER BY branch
             """
-        )
+        ),
+        branch_params,
     ).scalars().all()
+
+    feeder_params: dict[str, object] = {}
+    feeder_clauses = ["feeder IS NOT NULL", "feeder <> ''"]
+
+    if service_area:
+        feeder_clauses.append("service_area = :service_area")
+        feeder_params["service_area"] = service_area
+
+    if branch:
+        feeder_clauses.append("branch = :branch")
+        feeder_params["branch"] = branch
 
     feeders = db.execute(
         text(
-            """
-            SELECT DISTINCT feeder
-            FROM assets
-            WHERE feeder IS NOT NULL AND feeder <> ''
-            ORDER BY feeder
-            """
-        )
+            "SELECT DISTINCT feeder FROM assets WHERE "
+            + " AND ".join(feeder_clauses)
+            + " ORDER BY feeder"
+        ),
+        feeder_params,
     ).scalars().all()
 
     return {
