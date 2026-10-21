@@ -7,10 +7,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from ..config import get_settings
 from ..db import get_db
 
 
 router = APIRouter(tags=["operations"])
+settings = get_settings()
 
 AssetStatus = Literal[
     "unknown",
@@ -22,6 +24,11 @@ AssetStatus = Literal[
 AssetCondition = Literal["unknown", "good", "fair", "poor", "critical"]
 MaintenancePriority = Literal["unassigned", "low", "medium", "high", "critical"]
 MaintenanceStatus = Literal["planned", "in_progress", "completed", "cancelled"]
+
+def _require_demo_writes() -> None:
+    if not settings.demo_writes_enabled:
+        raise HTTPException(status_code=403, detail="Public deployment is read-only.")
+
 
 
 class OperationalStateUpdate(BaseModel):
