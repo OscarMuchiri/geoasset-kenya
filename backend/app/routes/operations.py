@@ -141,6 +141,7 @@ def update_asset_operations(
     asset_id: UUID,
     payload: OperationalStateUpdate,
     db: Session = Depends(get_db),
+    _: None = Depends(_require_demo_writes),
 ) -> dict:
     _require_asset(db, asset_id)
 
