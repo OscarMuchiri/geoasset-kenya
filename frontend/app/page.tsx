@@ -717,6 +717,36 @@ export default function HomePage() {
     syncSelectedLine(null);
   };
 
+  const handleOperationalStateChange = useCallback((state: {
+    status: string;
+    condition: string;
+    maintenance_priority: string;
+    asset_type: string;
+  }) => {
+    setSelected((current) => {
+      if (!current || current.kind !== "asset") return current;
+
+      const updatedFeature: AssetFeature = {
+        ...current.feature,
+        properties: {
+          ...current.feature.properties,
+          status: state.status,
+          condition: state.condition,
+          maintenance_priority: state.maintenance_priority
+        }
+      };
+
+      syncSelectedPoint(updatedFeature);
+      return { kind: "asset", feature: updatedFeature };
+    });
+
+    if (state.asset_type === "transmission_station") {
+      void loadInfrastructure();
+    } else {
+      void loadTransformersRef.current();
+    }
+  }, [loadInfrastructure, syncSelectedPoint]);
+
   const toggleLayer = (key: keyof LayerVisibility) => {
     setLayers((current) => ({ ...current, [key]: !current[key] }));
   };
@@ -889,7 +919,13 @@ export default function HomePage() {
           />
         )}
 
-        {selected && <DetailDrawer selected={selected} onClose={closeDetails} />}
+        {selected && (
+          <DetailDrawer
+            selected={selected}
+            onClose={closeDetails}
+            onAssetStateChange={handleOperationalStateChange}
+          />
+        )}
       </section>
     </main>
   );
@@ -1037,10 +1073,17 @@ function LayerToggle({
 
 function DetailDrawer({
   selected,
-  onClose
+  onClose,
+  onAssetStateChange
 }: {
   selected: Exclude<SelectedItem, null>;
   onClose: () => void;
+  onAssetStateChange: (state: {
+    status: string;
+    condition: string;
+    maintenance_priority: string;
+    asset_type: string;
+  }) => void;
 }) {
   if (selected.kind === "network") {
     const p = selected.feature.properties;
@@ -1098,7 +1141,10 @@ function DetailDrawer({
         <Detail label="Condition" value={p.condition} />
       </dl>
       {(p.asset_id || feature.id !== undefined && feature.id !== null) && (
-        <AssetOperations assetId={String(p.asset_id || feature.id)} />
+        <AssetOperations
+          assetId={String(p.asset_id || feature.id)}
+          onStateChange={onAssetStateChange}
+        />
       )}
       <div className="provenance">
         <strong>Data provenance</strong>
