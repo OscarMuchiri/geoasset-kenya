@@ -90,9 +90,9 @@ geoasset-kenya/
 - [x] Build repeatable ingestion pipeline
 - [x] Load transformer layer into PostGIS
 - [x] Load transmission station layer into PostGIS
-- [ ] Load electricity network layers into PostGIS
+- [x] Load 66/132/220 kV electricity network layers into PostGIS
 - [x] Build FastAPI asset endpoints
-- [ ] Build interactive MapLibre interface
+- [x] Build interactive MapLibre interface
 - [ ] Add inspection and maintenance workflows
 - [ ] Add analytics and spatial-query tools
 - [ ] Deploy production application
