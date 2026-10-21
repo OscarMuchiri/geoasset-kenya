@@ -72,7 +72,13 @@ function formatDate(value: string | null) {
   });
 }
 
-export default function AssetOperations({ assetId }: { assetId: string }) {
+export default function AssetOperations({
+  assetId,
+  onStateChange
+}: {
+  assetId: string;
+  onStateChange?: (state: OperationalState) => void;
+}) {
   const [data, setData] = useState<OperationsResponse | null>(null);
   const [mode, setMode] = useState<Mode>(null);
   const [busy, setBusy] = useState(false);
@@ -100,6 +106,7 @@ export default function AssetOperations({ assetId }: { assetId: string }) {
     setStatus(result.asset.status || "unknown");
     setCondition(result.asset.condition || "unknown");
     setPriority(result.asset.maintenance_priority || "unassigned");
+    onStateChange?.(result.asset);
   };
 
   useEffect(() => {
