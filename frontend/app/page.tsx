@@ -506,7 +506,15 @@ export default function HomePage() {
         id: "transformer-condition-ring",
         type: "circle",
         source: "transformers",
-        filter: ["!", ["has", "point_count"]],
+        filter: [
+          "all",
+          ["!", ["has", "point_count"]],
+          [
+            "any",
+            ["in", ["coalesce", ["get", "condition"], "unknown"], ["literal", ["good", "fair", "poor", "critical"]]],
+            ["in", ["coalesce", ["get", "status"], "unknown"], ["literal", ["active", "attention", "maintenance_planned", "out_of_service"]]]
+          ]
+        ],
         paint: {
           "circle-radius": 8.4,
           "circle-color": "#000000",
@@ -529,16 +537,7 @@ export default function HomePage() {
               "#64748b"
             ]
           ],
-          "circle-stroke-opacity": [
-            "case",
-            [
-              "any",
-              ["!=", ["coalesce", ["get", "condition"], "unknown"], "unknown"],
-              ["!=", ["coalesce", ["get", "status"], "unknown"], "unknown"]
-            ],
-            0.98,
-            0
-          ]
+          "circle-stroke-opacity": 0.98
         }
       });
 
@@ -571,6 +570,11 @@ export default function HomePage() {
         id: "station-condition-ring",
         type: "circle",
         source: "stations",
+        filter: [
+          "any",
+          ["in", ["coalesce", ["get", "condition"], "unknown"], ["literal", ["good", "fair", "poor", "critical"]]],
+          ["in", ["coalesce", ["get", "status"], "unknown"], ["literal", ["active", "attention", "maintenance_planned", "out_of_service"]]]
+        ],
         paint: {
           "circle-radius": 12,
           "circle-color": "#000000",
@@ -593,16 +597,7 @@ export default function HomePage() {
               "#64748b"
             ]
           ],
-          "circle-stroke-opacity": [
-            "case",
-            [
-              "any",
-              ["!=", ["coalesce", ["get", "condition"], "unknown"], "unknown"],
-              ["!=", ["coalesce", ["get", "status"], "unknown"], "unknown"]
-            ],
-            0.98,
-            0
-          ]
+          "circle-stroke-opacity": 0.98
         }
       });
 
