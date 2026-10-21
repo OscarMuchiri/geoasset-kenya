@@ -178,6 +178,7 @@ def create_inspection(
     asset_id: UUID,
     payload: InspectionCreate,
     db: Session = Depends(get_db),
+    _: None = Depends(_require_demo_writes),
 ) -> dict:
     _require_asset(db, asset_id)
 
@@ -245,6 +246,7 @@ def create_maintenance(
     asset_id: UUID,
     payload: MaintenanceCreate,
     db: Session = Depends(get_db),
+    _: None = Depends(_require_demo_writes),
 ) -> dict:
     _require_asset(db, asset_id)
 
