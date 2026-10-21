@@ -21,6 +21,10 @@ npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 
+# Database snapshots
+*.dump
+*.sql.gz
+
 # Local datasets
 data/raw/
 data/processed/
