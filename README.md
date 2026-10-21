@@ -89,7 +89,8 @@ geoasset-kenya/
 - [ ] Download and profile source datasets
 - [x] Build repeatable ingestion pipeline
 - [x] Load transformer layer into PostGIS
-- [ ] Load substation and network layers into PostGIS
+- [x] Load transmission station layer into PostGIS
+- [ ] Load electricity network layers into PostGIS
 - [x] Build FastAPI asset endpoints
 - [ ] Build interactive MapLibre interface
 - [ ] Add inspection and maintenance workflows
