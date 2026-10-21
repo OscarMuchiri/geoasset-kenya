@@ -2,12 +2,15 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
+from .config import get_settings
 from .db import engine
 from .routes.assets import router as assets_router
 from .routes.network import router as network_router
 from .routes.analytics import router as analytics_router
 from .routes.operations import router as operations_router
 
+
+settings = get_settings()
 
 app = FastAPI(
     title="GeoAsset Kenya API",
@@ -17,10 +20,8 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=settings.allowed_origins,
+    allow_origin_regex=settings.cors_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
