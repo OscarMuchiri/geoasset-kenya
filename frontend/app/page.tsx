@@ -207,27 +207,33 @@ export default function HomePage() {
     if (!map || !map.isStyleLoaded()) return;
 
     try {
-      const [stationsResponse, networkResponse] = await Promise.all([
-        fetch(`${API_URL}/assets?asset_type=transmission_station&limit=500`),
-        fetch(`${API_URL}/network-lines?limit=5000`)
-      ]);
+      const stationsResponse = await fetch(
+        `${API_URL}/assets?asset_type=transmission_station&limit=500`
+      );
 
-      if (!stationsResponse.ok || !networkResponse.ok) {
-        throw new Error("Infrastructure layer request failed");
+      if (!stationsResponse.ok) {
+        throw new Error(`Station API returned ${stationsResponse.status}`);
       }
 
-      const [stations, network] = await Promise.all([
-        stationsResponse.json(),
-        networkResponse.json()
-      ]);
-
+      const stations = await stationsResponse.json();
       (map.getSource("stations") as GeoJSONSource | undefined)?.setData(stations);
-      (map.getSource("network") as GeoJSONSource | undefined)?.setData(network);
-
       setStationCount(stations?.meta?.count ?? stations?.features?.length ?? 0);
+    } catch (error) {
+      console.error("Could not load transmission stations", error);
+    }
+
+    try {
+      const networkResponse = await fetch(`${API_URL}/network-lines?limit=5000`);
+
+      if (!networkResponse.ok) {
+        throw new Error(`Network API returned ${networkResponse.status}`);
+      }
+
+      const network = await networkResponse.json();
+      (map.getSource("network") as GeoJSONSource | undefined)?.setData(network);
       setNetworkCount(network?.meta?.count ?? network?.features?.length ?? 0);
     } catch (error) {
-      console.error("Could not load station/network layers", error);
+      console.error("Could not load transmission network", error);
     }
   }, []);
 
