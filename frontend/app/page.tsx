@@ -20,6 +20,7 @@ import {
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
 type FeatureProperties = {
+  asset_id?: string | null;
   source_id?: string | null;
   asset_type?: string | null;
   asset_type_name?: string | null;
@@ -1096,8 +1097,8 @@ function DetailDrawer({
         <Detail label="Status" value={p.status} />
         <Detail label="Condition" value={p.condition} />
       </dl>
-      {feature.id !== undefined && feature.id !== null && (
-        <AssetOperations assetId={String(feature.id)} />
+      {(p.asset_id || feature.id !== undefined && feature.id !== null) && (
+        <AssetOperations assetId={String(p.asset_id || feature.id)} />
       )}
       <div className="provenance">
         <strong>Data provenance</strong>
