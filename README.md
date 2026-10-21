@@ -62,7 +62,7 @@ PostgreSQL + PostGIS
    └── maintenance records
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the planned system design.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the system design and the [Deployment guide](docs/DEPLOYMENT.md) for production setup.
 
 ## Repository structure
 
@@ -80,13 +80,13 @@ geoasset-kenya/
 
 ## Current status
 
-**Phase 1 — Foundation and data preparation**
+**Production-ready portfolio build — deployment in progress**
 
 - [x] Project repository created
 - [x] Architecture selected
 - [x] Core public data sources verified
 - [x] Initial PostGIS schema designed
-- [ ] Download and profile source datasets
+- [x] Download and profile source datasets
 - [x] Build repeatable ingestion pipeline
 - [x] Load transformer layer into PostGIS
 - [x] Load transmission station layer into PostGIS
@@ -94,8 +94,8 @@ geoasset-kenya/
 - [x] Build FastAPI asset endpoints
 - [x] Build interactive MapLibre interface
 - [x] Add interactive infrastructure analytics and feature inspection
-- [ ] Add inspection and maintenance workflows
-- [ ] Add analytics and spatial-query tools
+- [x] Add inspection and maintenance workflows
+- [x] Add analytics and spatial-query tools
 - [ ] Deploy production application
 
 ## Local development
