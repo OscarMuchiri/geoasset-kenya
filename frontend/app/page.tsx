@@ -139,6 +139,9 @@ export default function HomePage() {
   const [serviceArea, setServiceArea] = useState("");
   const [branch, setBranch] = useState("");
   const [feeder, setFeeder] = useState("");
+  const [operationalStatus, setOperationalStatus] = useState("");
+  const [conditionFilter, setConditionFilter] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
@@ -193,6 +196,9 @@ export default function HomePage() {
     if (serviceArea) params.set("service_area", serviceArea);
     if (branch) params.set("branch", branch);
     if (feeder) params.set("feeder", feeder);
+    if (operationalStatus) params.set("status", operationalStatus);
+    if (conditionFilter) params.set("condition", conditionFilter);
+    if (priorityFilter) params.set("maintenance_priority", priorityFilter);
 
     if (searchQuery) {
       params.set("q", searchQuery);
@@ -249,15 +255,23 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, [branch, feeder, searchQuery, serviceArea, syncSelectedPoint]);
+  }, [branch, conditionFilter, feeder, operationalStatus, priorityFilter, searchQuery, serviceArea, syncSelectedPoint]);
 
   const loadInfrastructure = useCallback(async () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
     try {
+      const stationParams = new URLSearchParams({
+        asset_type: "transmission_station",
+        limit: "500"
+      });
+      if (operationalStatus) stationParams.set("status", operationalStatus);
+      if (conditionFilter) stationParams.set("condition", conditionFilter);
+      if (priorityFilter) stationParams.set("maintenance_priority", priorityFilter);
+
       const stationsResponse = await fetch(
-        `${API_URL}/assets?asset_type=transmission_station&limit=500`
+        `${API_URL}/assets?${stationParams.toString()}`
       );
 
       if (!stationsResponse.ok) {
@@ -284,7 +298,7 @@ export default function HomePage() {
     } catch (error) {
       console.error("Could not load transmission network", error);
     }
-  }, []);
+  }, [conditionFilter, operationalStatus, priorityFilter]);
 
   useEffect(() => {
     loadTransformersRef.current = loadTransformers;
@@ -770,6 +784,9 @@ export default function HomePage() {
     setServiceArea("");
     setBranch("");
     setFeeder("");
+    setOperationalStatus("");
+    setConditionFilter("");
+    setPriorityFilter("");
     setSearchInput("");
     setSearchQuery("");
     setSelected(null);
@@ -934,6 +951,46 @@ export default function HomePage() {
             </label>
 
             <button className="secondary-button" onClick={resetFilters} type="button">Clear filters</button>
+          </section>
+
+          <section className="filter-section demo-filter-section">
+            <div className="section-title"><Activity size={15} /><span>Demo operations</span></div>
+
+            <label>
+              Status
+              <select value={operationalStatus} onChange={(e) => setOperationalStatus(e.target.value)}>
+                <option value="">All statuses</option>
+                <option value="active">Active</option>
+                <option value="attention">Attention</option>
+                <option value="maintenance_planned">Maintenance planned</option>
+                <option value="out_of_service">Out of service</option>
+                <option value="unknown">Unknown</option>
+              </select>
+            </label>
+
+            <label>
+              Condition
+              <select value={conditionFilter} onChange={(e) => setConditionFilter(e.target.value)}>
+                <option value="">All conditions</option>
+                <option value="good">Good</option>
+                <option value="fair">Fair</option>
+                <option value="poor">Poor</option>
+                <option value="critical">Critical</option>
+                <option value="unknown">Unknown</option>
+              </select>
+            </label>
+
+            <label>
+              Maintenance priority
+              <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)}>
+                <option value="">All priorities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+                <option value="unassigned">Unassigned</option>
+              </select>
+            </label>
           </section>
 
           <section className="metric-grid">
