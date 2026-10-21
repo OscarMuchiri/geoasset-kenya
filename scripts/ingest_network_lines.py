@@ -62,8 +62,9 @@ def main() -> None:
     else:
         gdf = gdf.to_crs(4326)
 
+    valid_geometry = gdf.geometry.notna() & ~gdf.geometry.is_empty
     gdf = gdf[
-        gdf.geometry.notna()
+        valid_geometry
         & gdf.geometry.geom_type.isin(["LineString", "MultiLineString"])
     ].copy()
     print(f"Usable line features: {len(gdf):,}")
