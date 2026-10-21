@@ -503,6 +503,46 @@ export default function HomePage() {
       });
 
       map.addLayer({
+        id: "transformer-condition-ring",
+        type: "circle",
+        source: "transformers",
+        filter: ["!", ["has", "point_count"]],
+        paint: {
+          "circle-radius": 8.4,
+          "circle-color": "#000000",
+          "circle-opacity": 0,
+          "circle-stroke-width": 2.4,
+          "circle-stroke-color": [
+            "match",
+            ["coalesce", ["get", "condition"], "unknown"],
+            "good", "#22c55e",
+            "fair", "#eab308",
+            "poor", "#f97316",
+            "critical", "#ef4444",
+            [
+              "match",
+              ["coalesce", ["get", "status"], "unknown"],
+              "active", "#22c55e",
+              "attention", "#f59e0b",
+              "maintenance_planned", "#f59e0b",
+              "out_of_service", "#ef4444",
+              "#64748b"
+            ]
+          ],
+          "circle-stroke-opacity": [
+            "case",
+            [
+              "any",
+              ["!=", ["coalesce", ["get", "condition"], "unknown"], "unknown"],
+              ["!=", ["coalesce", ["get", "status"], "unknown"], "unknown"]
+            ],
+            0.98,
+            0
+          ]
+        }
+      });
+
+      map.addLayer({
         id: "transformer-points",
         type: "circle",
         source: "transformers",
@@ -524,6 +564,45 @@ export default function HomePage() {
           "circle-radius": 13,
           "circle-color": "#f59e0b",
           "circle-opacity": 0.2
+        }
+      });
+
+      map.addLayer({
+        id: "station-condition-ring",
+        type: "circle",
+        source: "stations",
+        paint: {
+          "circle-radius": 12,
+          "circle-color": "#000000",
+          "circle-opacity": 0,
+          "circle-stroke-width": 3,
+          "circle-stroke-color": [
+            "match",
+            ["coalesce", ["get", "condition"], "unknown"],
+            "good", "#22c55e",
+            "fair", "#eab308",
+            "poor", "#f97316",
+            "critical", "#ef4444",
+            [
+              "match",
+              ["coalesce", ["get", "status"], "unknown"],
+              "active", "#22c55e",
+              "attention", "#f59e0b",
+              "maintenance_planned", "#f59e0b",
+              "out_of_service", "#ef4444",
+              "#64748b"
+            ]
+          ],
+          "circle-stroke-opacity": [
+            "case",
+            [
+              "any",
+              ["!=", ["coalesce", ["get", "condition"], "unknown"], "unknown"],
+              ["!=", ["coalesce", ["get", "status"], "unknown"], "unknown"]
+            ],
+            0.98,
+            0
+          ]
         }
       });
 
