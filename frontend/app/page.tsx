@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import maplibregl, { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
+import AssetOperations from "../components/AssetOperations";
 import {
   Activity,
   BarChart3,
@@ -1095,6 +1096,9 @@ function DetailDrawer({
         <Detail label="Status" value={p.status} />
         <Detail label="Condition" value={p.condition} />
       </dl>
+      {feature.id !== undefined && feature.id !== null && (
+        <AssetOperations assetId={String(feature.id)} />
+      )}
       <div className="provenance">
         <strong>Data provenance</strong>
         <span>{p.source_name || "Public infrastructure dataset"}</span>
