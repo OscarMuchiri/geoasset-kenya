@@ -637,6 +637,57 @@ export default function HomePage() {
     }
   }, [layers]);
 
+  const focusScope = useCallback(async ({
+    serviceArea: nextServiceArea,
+    branch: nextBranch,
+    feeder: nextFeeder
+  }: {
+    serviceArea?: string;
+    branch?: string;
+    feeder?: string;
+  }) => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const params = new URLSearchParams({
+      asset_type: "distribution_transformer"
+    });
+    if (nextServiceArea) params.set("service_area", nextServiceArea);
+    if (nextBranch) params.set("branch", nextBranch);
+    if (nextFeeder) params.set("feeder", nextFeeder);
+
+    try {
+      const response = await fetch(`${API_URL}/assets/bounds?${params.toString()}`);
+      if (!response.ok) throw new Error(`Bounds API returned ${response.status}`);
+      const bounds = await response.json();
+
+      const samePoint =
+        bounds.min_lon === bounds.max_lon && bounds.min_lat === bounds.max_lat;
+
+      if (samePoint) {
+        map.easeTo({
+          center: [bounds.min_lon, bounds.min_lat],
+          zoom: 13,
+          duration: 850
+        });
+      } else {
+        map.fitBounds(
+          [
+            [bounds.min_lon, bounds.min_lat],
+            [bounds.max_lon, bounds.max_lat]
+          ],
+          {
+            padding: { top: 100, right: 90, bottom: 70, left: 90 },
+            maxZoom: 12.5,
+            duration: 900
+          }
+        );
+      }
+    } catch (error) {
+      console.error("Could not focus selected analytics scope", error);
+    }
+  }, []);
+
   const resetFilters = () => {
     setServiceArea("");
     setBranch("");
@@ -808,6 +859,30 @@ export default function HomePage() {
             serviceArea={serviceArea}
             branch={branch}
             feeder={feeder}
+            onSelectServiceArea={(value) => {
+              setServiceArea(value);
+              setBranch("");
+              setFeeder("");
+              setSearchInput("");
+              setSearchQuery("");
+              setSelected(null);
+              syncSelectedPoint(null);
+              syncSelectedLine(null);
+              setAnalyticsOpen(false);
+              void focusScope({ serviceArea: value });
+            }}
+            onSelectBranch={(value) => {
+              const scopedServiceArea = serviceArea || undefined;
+              setBranch(value);
+              setFeeder("");
+              setSearchInput("");
+              setSearchQuery("");
+              setSelected(null);
+              syncSelectedPoint(null);
+              syncSelectedLine(null);
+              setAnalyticsOpen(false);
+              void focusScope({ serviceArea: scopedServiceArea, branch: value });
+            }}
             onClose={() => setAnalyticsOpen(false)}
           />
         )}
@@ -823,12 +898,16 @@ function AnalyticsPanel({
   serviceArea,
   branch,
   feeder,
+  onSelectServiceArea,
+  onSelectBranch,
   onClose
 }: {
   analytics: AnalyticsSummary;
   serviceArea: string;
   branch: string;
   feeder: string;
+  onSelectServiceArea: (value: string) => void;
+  onSelectBranch: (value: string) => void;
   onClose: () => void;
 }) {
   const maxArea = Math.max(...analytics.top_service_areas.map((item) => item.value), 1);
@@ -873,12 +952,14 @@ function AnalyticsPanel({
         title="Largest service areas"
         items={analytics.top_service_areas}
         maxValue={maxArea}
+        onSelect={onSelectServiceArea}
       />
 
       <AnalyticsRanking
         title={serviceArea ? "Largest branches in scope" : "Largest branches"}
         items={analytics.top_branches}
         maxValue={maxBranch}
+        onSelect={onSelectBranch}
       />
     </aside>
   );
@@ -896,18 +977,26 @@ function AnalyticsKpi({ label, value }: { label: string; value: string }) {
 function AnalyticsRanking({
   title,
   items,
-  maxValue
+  maxValue,
+  onSelect
 }: {
   title: string;
   items: Array<{ label: string; value: number }>;
   maxValue: number;
+  onSelect: (value: string) => void;
 }) {
   return (
     <section className="analytics-section">
       <h3>{title}</h3>
       <div className="ranking-list">
         {items.map((item) => (
-          <div className="ranking-row" key={item.label}>
+          <button
+            type="button"
+            className="ranking-row"
+            key={item.label}
+            onClick={() => onSelect(item.label)}
+            title={`Filter map to ${item.label}`}
+          >
             <div className="ranking-heading">
               <span>{item.label}</span>
               <strong>{item.value.toLocaleString()}</strong>
@@ -915,7 +1004,7 @@ function AnalyticsRanking({
             <div className="ranking-track">
               <i style={{ width: `${Math.max(4, (item.value / maxValue) * 100)}%` }} />
             </div>
-          </div>
+          </button>
         ))}
       </div>
     </section>
