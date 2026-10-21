@@ -5,6 +5,7 @@ from sqlalchemy import text
 from .db import engine
 from .routes.assets import router as assets_router
 from .routes.network import router as network_router
+from .routes.analytics import router as analytics_router
 
 
 app = FastAPI(
@@ -26,6 +27,7 @@ app.add_middleware(
 
 app.include_router(assets_router)
 app.include_router(network_router)
+app.include_router(analytics_router)
 
 
 @app.get("/", tags=["system"])
