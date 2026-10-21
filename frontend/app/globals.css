@@ -1150,3 +1150,44 @@ select:disabled {
 .detail-drawer {
   width: min(410px, calc(100% - 36px));
 }
+
+
+.condition-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+  color: #64748b;
+  font-size: 8px;
+}
+
+.condition-legend-title {
+  width: 100%;
+  color: #7f8ea3;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.condition-legend span:not(.condition-legend-title) {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.condition-legend i {
+  width: 8px;
+  height: 8px;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.condition-good { color: #22c55e; }
+.condition-fair { color: #eab308; }
+.condition-poor { color: #f97316; }
+.condition-critical { color: #ef4444; }
