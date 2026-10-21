@@ -727,7 +727,9 @@ export default function HomePage() {
       if (!current || current.kind !== "asset") return current;
 
       const updatedFeature: AssetFeature = {
-        ...current.feature,
+        type: "Feature",
+        id: current.feature.id,
+        geometry: current.feature.geometry,
         properties: {
           ...current.feature.properties,
           status: state.status,
