@@ -98,7 +98,7 @@ export default function AssetOperations({
   const [maintenanceStatus, setMaintenanceStatus] = useState("planned");
   const [maintenanceNotes, setMaintenanceNotes] = useState("");
 
-  const load = async () => {
+  const load = async (notifyParent = false) => {
     const response = await fetch(`${API_URL}/assets/${assetId}/operations`);
     if (!response.ok) throw new Error(`Operations API returned ${response.status}`);
     const result = (await response.json()) as OperationsResponse;
@@ -106,7 +106,7 @@ export default function AssetOperations({
     setStatus(result.asset.status || "unknown");
     setCondition(result.asset.condition || "unknown");
     setPriority(result.asset.maintenance_priority || "unassigned");
-    onStateChange?.(result.asset);
+    if (notifyParent) onStateChange?.(result.asset);
   };
 
   useEffect(() => {
@@ -128,7 +128,7 @@ export default function AssetOperations({
         const detail = await response.text();
         throw new Error(detail || `Request failed with ${response.status}`);
       }
-      await load();
+      await load(true);
       setFeedback(successMessage);
       setMode(null);
     } catch (error) {
