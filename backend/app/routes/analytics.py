@@ -32,6 +32,17 @@ def analytics_summary(
 
     transformer_where = " AND ".join(transformer_clauses)
 
+    transformer_total = db.execute(
+        text(
+            """
+            SELECT COUNT(*)
+            FROM assets a
+            JOIN asset_types at ON at.id = a.asset_type_id
+            WHERE at.code = 'distribution_transformer'
+            """
+        )
+    ).scalar_one()
+
     transformer_scope = db.execute(
         text(
             f"""
@@ -131,7 +142,7 @@ def analytics_summary(
 
     return {
         "transformers": {
-            "total": 57360,
+            "total": int(transformer_total),
             "scope_count": int(transformer_scope),
             "service_areas": int(footprint["service_areas"] or 0),
             "branches": int(footprint["branches"] or 0),
