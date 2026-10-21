@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -26,8 +27,30 @@ SOURCE_NAME = "Kenya - Transmission Stations (ENERGYDATA.INFO)"
 SOURCE_LICENSE = "CC0 1.0"
 
 ID_CANDIDATES = ("OBJECTID", "ObjectID", "objectid", "FID", "fid", "ID", "id")
-NAME_CANDIDATES = ("name", "Name", "NAME", "station", "Station", "STATION")
-VOLTAGE_CANDIDATES = ("voltage_kv", "Voltage", "VOLTAGE", "voltage", "KV", "kV")
+NAME_CANDIDATES = ("Name_IMS11", "name", "Name", "NAME", "station", "Station", "STATION")
+
+FIELD_MAP = {
+    "region": "RCC1",
+    "service_area": "County2",
+    "branch": "Branch3",
+    "street_name": "Street40",
+}
+
+def parse_voltage_from_name(value: Any) -> float | None:
+    """Return the highest kV value embedded in the station name, if present."""
+    if value is None:
+        return None
+
+    text_value = str(value).upper()
+    match = re.search(r"\(([^)]*?)\s*K\.?V\.?", text_value)
+    if not match:
+        return None
+
+    numbers = [
+        float(item)
+        for item in re.findall(r"\d+(?:\.\d+)?", match.group(1))
+    ]
+    return max(numbers) if numbers else None
 
 
 def parse_args() -> argparse.Namespace:
@@ -119,11 +142,13 @@ def main() -> None:
             """
             INSERT INTO assets (
                 source_id, asset_type_id, name, voltage_kv,
+                region, service_area, branch, street_name,
                 status, condition, maintenance_priority,
                 source_name, source_license, source_properties, geom
             )
             VALUES (
                 :source_id, :asset_type_id, :name, :voltage_kv,
+                :region, :service_area, :branch, :street_name,
                 'unknown', 'unknown', 'unassigned',
                 :source_name, :source_license, CAST(:source_properties AS jsonb),
                 ST_SetSRID(ST_MakePoint(:longitude, :latitude), 4326)
@@ -140,12 +165,24 @@ def main() -> None:
             }
             point = row.geometry
             source_id = first_value(properties, ID_CANDIDATES) or f"transmission-{row_number}"
+            name = first_value(properties, NAME_CANDIDATES)
+            normalized_fields = {
+                target: (
+                    str(properties[source]).strip()
+                    if properties.get(source) is not None
+                    and str(properties[source]).strip()
+                    else None
+                )
+                for target, source in FIELD_MAP.items()
+            }
+
             payload.append(
                 {
                     "source_id": str(source_id),
                     "asset_type_id": asset_type_id,
-                    "name": first_value(properties, NAME_CANDIDATES),
-                    "voltage_kv": as_float(first_value(properties, VOLTAGE_CANDIDATES)),
+                    "name": name,
+                    "voltage_kv": parse_voltage_from_name(name),
+                    **normalized_fields,
                     "source_name": SOURCE_NAME,
                     "source_license": SOURCE_LICENSE,
                     "source_properties": json.dumps(properties, default=str),
