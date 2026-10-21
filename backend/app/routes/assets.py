@@ -50,6 +50,9 @@ def list_assets(
     service_area: str | None = None,
     branch: str | None = None,
     feeder: str | None = None,
+    status: str | None = None,
+    condition: str | None = None,
+    maintenance_priority: str | None = None,
     q: str | None = Query(None, min_length=2, max_length=120),
     min_lon: float | None = Query(None, ge=-180, le=180),
     min_lat: float | None = Query(None, ge=-90, le=90),
@@ -77,6 +80,18 @@ def list_assets(
     if feeder:
         clauses.append("a.feeder = :feeder")
         params["feeder"] = feeder
+
+    if status:
+        clauses.append("a.status = :status")
+        params["status"] = status
+
+    if condition:
+        clauses.append("a.condition = :condition")
+        params["condition"] = condition
+
+    if maintenance_priority:
+        clauses.append("a.maintenance_priority = :maintenance_priority")
+        params["maintenance_priority"] = maintenance_priority
 
     if q:
         clauses.append(
