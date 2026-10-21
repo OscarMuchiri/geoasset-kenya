@@ -11,14 +11,18 @@ import {
   MapPin,
   RefreshCw,
   Search,
-  X
+  X,
+  Zap
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
 type FeatureProperties = {
   source_id?: string | null;
+  asset_type?: string | null;
   asset_type_name?: string | null;
+  name?: string | null;
+  voltage_kv?: number | null;
   service_area?: string | null;
   branch?: string | null;
   feeder?: string | null;
@@ -35,24 +39,67 @@ type FeatureProperties = {
 
 type AssetFeature = GeoJSON.Feature<GeoJSON.Point, FeatureProperties>;
 
+type NetworkProperties = {
+  source_id?: string | null;
+  name?: string | null;
+  voltage_kv?: number | null;
+  network_class?: string | null;
+  source_name?: string | null;
+  source_license?: string | null;
+};
+
+type NetworkFeature = GeoJSON.Feature<
+  GeoJSON.LineString | GeoJSON.MultiLineString,
+  NetworkProperties
+>;
+
+type SelectedItem =
+  | { kind: "asset"; feature: AssetFeature }
+  | { kind: "network"; feature: NetworkFeature }
+  | null;
+
 type FilterOptions = {
   service_areas: string[];
   branches: string[];
   feeders: string[];
 };
 
-const emptyCollection: GeoJSON.FeatureCollection<GeoJSON.Point, FeatureProperties> = {
+type LayerVisibility = {
+  transformers: boolean;
+  stations: boolean;
+  network: boolean;
+};
+
+const emptyPoints: GeoJSON.FeatureCollection<GeoJSON.Point, FeatureProperties> = {
   type: "FeatureCollection",
   features: []
 };
 
+const emptyLines: GeoJSON.FeatureCollection<
+  GeoJSON.LineString | GeoJSON.MultiLineString,
+  NetworkProperties
+> = {
+  type: "FeatureCollection",
+  features: []
+};
+
+const TRANSFORMER_LAYERS = [
+  "cluster-halo",
+  "clusters",
+  "cluster-count",
+  "transformer-halo",
+  "transformer-points"
+];
+const STATION_LAYERS = ["station-halo", "station-points"];
+const NETWORK_LAYERS = ["network-lines", "network-lines-highlight"];
+
 export default function HomePage() {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
-  const loadAssetsRef = useRef<() => Promise<void>>(async () => {});
+  const loadTransformersRef = useRef<() => Promise<void>>(async () => {});
   const searchQueryRef = useRef("");
 
-  const [selected, setSelected] = useState<AssetFeature | null>(null);
+  const [selected, setSelected] = useState<SelectedItem>(null);
   const [serviceArea, setServiceArea] = useState("");
   const [branch, setBranch] = useState("");
   const [feeder, setFeeder] = useState("");
@@ -64,24 +111,28 @@ export default function HomePage() {
     feeders: []
   });
   const [visibleCount, setVisibleCount] = useState(0);
+  const [stationCount, setStationCount] = useState(0);
+  const [networkCount, setNetworkCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("Loading infrastructure…");
+  const [layers, setLayers] = useState<LayerVisibility>({
+    transformers: true,
+    stations: true,
+    network: true
+  });
 
-  const syncSelectedSource = useCallback((feature: AssetFeature | null) => {
+  const syncSelectedPoint = useCallback((feature: AssetFeature | null) => {
     const map = mapRef.current;
     if (!map) return;
     const source = map.getSource("selected-asset") as GeoJSONSource | undefined;
     source?.setData(
       feature
-        ? {
-            type: "FeatureCollection",
-            features: [feature]
-          }
-        : emptyCollection
+        ? { type: "FeatureCollection", features: [feature] }
+        : emptyPoints
     );
   }, []);
 
-  const loadAssets = useCallback(async () => {
+  const loadTransformers = useCallback(async () => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
@@ -126,15 +177,15 @@ export default function HomePage() {
         );
 
         const first = data?.features?.[0] as AssetFeature | undefined;
-        if (first && Array.isArray(first.geometry?.coordinates)) {
+        if (first) {
           const [longitude, latitude] = first.geometry.coordinates;
           map.easeTo({
             center: [longitude, latitude],
             zoom: Math.max(map.getZoom(), 12.5),
             duration: 900
           });
-          setSelected(first);
-          syncSelectedSource(first);
+          setSelected({ kind: "asset", feature: first });
+          syncSelectedPoint(first);
         }
       } else {
         setMessage(
@@ -149,12 +200,41 @@ export default function HomePage() {
     } finally {
       setLoading(false);
     }
-  }, [branch, feeder, searchQuery, serviceArea, syncSelectedSource]);
+  }, [branch, feeder, searchQuery, serviceArea, syncSelectedPoint]);
+
+  const loadInfrastructure = useCallback(async () => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    try {
+      const [stationsResponse, networkResponse] = await Promise.all([
+        fetch(`${API_URL}/assets?asset_type=transmission_station&limit=500`),
+        fetch(`${API_URL}/network-lines?limit=5000`)
+      ]);
+
+      if (!stationsResponse.ok || !networkResponse.ok) {
+        throw new Error("Infrastructure layer request failed");
+      }
+
+      const [stations, network] = await Promise.all([
+        stationsResponse.json(),
+        networkResponse.json()
+      ]);
+
+      (map.getSource("stations") as GeoJSONSource | undefined)?.setData(stations);
+      (map.getSource("network") as GeoJSONSource | undefined)?.setData(network);
+
+      setStationCount(stations?.meta?.count ?? stations?.features?.length ?? 0);
+      setNetworkCount(network?.meta?.count ?? network?.features?.length ?? 0);
+    } catch (error) {
+      console.error("Could not load station/network layers", error);
+    }
+  }, []);
 
   useEffect(() => {
-    loadAssetsRef.current = loadAssets;
+    loadTransformersRef.current = loadTransformers;
     searchQueryRef.current = searchQuery;
-  }, [loadAssets, searchQuery]);
+  }, [loadTransformers, searchQuery]);
 
   useEffect(() => {
     const params = new URLSearchParams();
@@ -162,14 +242,9 @@ export default function HomePage() {
     if (branch) params.set("branch", branch);
 
     fetch(`${API_URL}/assets/filter-options?${params.toString()}`)
-      .then((response) => {
-        if (!response.ok) throw new Error("Could not load filter options");
-        return response.json();
-      })
+      .then((response) => response.json())
       .then((data) => setFilterOptions(data))
-      .catch(() => {
-        setFilterOptions((current) => current);
-      });
+      .catch(() => undefined);
   }, [branch, serviceArea]);
 
   useEffect(() => {
@@ -215,23 +290,54 @@ export default function HomePage() {
     });
 
     mapRef.current = map;
-    map.addControl(
-      new maplibregl.NavigationControl({ visualizePitch: true }),
-      "bottom-right"
-    );
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "bottom-right");
 
     map.on("load", () => {
+      map.addSource("network", { type: "geojson", data: emptyLines });
       map.addSource("transformers", {
         type: "geojson",
-        data: emptyCollection,
+        data: emptyPoints,
         cluster: true,
         clusterMaxZoom: 13,
         clusterRadius: 48
       });
+      map.addSource("stations", { type: "geojson", data: emptyPoints });
+      map.addSource("selected-asset", { type: "geojson", data: emptyPoints });
 
-      map.addSource("selected-asset", {
-        type: "geojson",
-        data: emptyCollection
+      map.addLayer({
+        id: "network-lines",
+        type: "line",
+        source: "network",
+        paint: {
+          "line-color": [
+            "match",
+            ["get", "network_class"],
+            "66kV", "#34d399",
+            "132kV", "#f59e0b",
+            "220kV", "#f43f5e",
+            "#94a3b8"
+          ],
+          "line-width": [
+            "match",
+            ["get", "network_class"],
+            "66kV", 2,
+            "132kV", 2.8,
+            "220kV", 3.8,
+            1.8
+          ],
+          "line-opacity": 0.9
+        }
+      });
+
+      map.addLayer({
+        id: "network-lines-highlight",
+        type: "line",
+        source: "network",
+        paint: {
+          "line-color": "#ffffff",
+          "line-width": 8,
+          "line-opacity": 0
+        }
       });
 
       map.addLayer({
@@ -241,15 +347,7 @@ export default function HomePage() {
         filter: ["has", "point_count"],
         paint: {
           "circle-color": "#22d3ee",
-          "circle-radius": [
-            "step",
-            ["get", "point_count"],
-            23,
-            100,
-            30,
-            750,
-            37
-          ],
+          "circle-radius": ["step", ["get", "point_count"], 23, 100, 30, 750, 37],
           "circle-opacity": 0.13,
           "circle-blur": 0.28
         }
@@ -261,24 +359,8 @@ export default function HomePage() {
         source: "transformers",
         filter: ["has", "point_count"],
         paint: {
-          "circle-color": [
-            "step",
-            ["get", "point_count"],
-            "#22d3ee",
-            100,
-            "#0ea5e9",
-            750,
-            "#2563eb"
-          ],
-          "circle-radius": [
-            "step",
-            ["get", "point_count"],
-            17,
-            100,
-            23,
-            750,
-            29
-          ],
+          "circle-color": ["step", ["get", "point_count"], "#22d3ee", 100, "#0ea5e9", 750, "#2563eb"],
+          "circle-radius": ["step", ["get", "point_count"], 17, 100, 23, 750, 29],
           "circle-opacity": 0.9,
           "circle-stroke-width": 2,
           "circle-stroke-color": "#083344"
@@ -325,49 +407,89 @@ export default function HomePage() {
       });
 
       map.addLayer({
+        id: "station-halo",
+        type: "circle",
+        source: "stations",
+        paint: {
+          "circle-radius": 11,
+          "circle-color": "#fbbf24",
+          "circle-opacity": 0.14
+        }
+      });
+
+      map.addLayer({
+        id: "station-points",
+        type: "circle",
+        source: "stations",
+        paint: {
+          "circle-radius": [
+            "interpolate",
+            ["linear"],
+            ["coalesce", ["get", "voltage_kv"], 66],
+            66, 5.5,
+            132, 7,
+            220, 8.5
+          ],
+          "circle-color": "#fde68a",
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#92400e",
+          "circle-opacity": 0.98
+        }
+      });
+
+      map.addLayer({
         id: "selected-asset-ring",
         type: "circle",
         source: "selected-asset",
         paint: {
-          "circle-radius": 11,
+          "circle-radius": 12,
           "circle-color": "#ffffff",
-          "circle-opacity": 0.09,
+          "circle-opacity": 0.08,
           "circle-stroke-width": 3,
           "circle-stroke-color": "#f8fafc"
         }
       });
 
-      loadAssetsRef.current();
+      loadTransformersRef.current();
+      loadInfrastructure();
     });
 
     map.on("moveend", () => {
-      if (!searchQueryRef.current) loadAssetsRef.current();
+      if (!searchQueryRef.current) loadTransformersRef.current();
     });
 
     map.on("click", "clusters", async (event) => {
-      const features = map.queryRenderedFeatures(event.point, {
-        layers: ["clusters"]
-      });
-      const feature = features[0];
+      const feature = map.queryRenderedFeatures(event.point, { layers: ["clusters"] })[0];
       const clusterId = feature?.properties?.cluster_id;
       if (clusterId === undefined) return;
-
       const source = map.getSource("transformers") as GeoJSONSource;
       const zoom = await source.getClusterExpansionZoom(clusterId);
-      const coordinates = (feature.geometry as GeoJSON.Point)
-        .coordinates as [number, number];
-
+      const coordinates = (feature.geometry as GeoJSON.Point).coordinates as [number, number];
       map.easeTo({ center: coordinates, zoom, duration: 700 });
     });
 
     map.on("click", "transformer-points", (event) => {
       const feature = event.features?.[0] as unknown as AssetFeature | undefined;
       if (!feature) return;
-      setSelected(feature);
-      syncSelectedSource(feature);
+      setSelected({ kind: "asset", feature });
+      syncSelectedPoint(feature);
     });
 
-    for (const layer of ["clusters", "transformer-points"]) {
+    map.on("click", "station-points", (event) => {
+      const feature = event.features?.[0] as unknown as AssetFeature | undefined;
+      if (!feature) return;
+      setSelected({ kind: "asset", feature });
+      syncSelectedPoint(feature);
+    });
+
+    map.on("click", "network-lines", (event) => {
+      const feature = event.features?.[0] as unknown as NetworkFeature | undefined;
+      if (!feature) return;
+      setSelected({ kind: "network", feature });
+      syncSelectedPoint(null);
+    });
+
+    for (const layer of ["clusters", "transformer-points", "station-points", "network-lines"]) {
       map.on("mouseenter", layer, () => {
         map.getCanvas().style.cursor = "pointer";
       });
@@ -380,40 +502,27 @@ export default function HomePage() {
       map.remove();
       mapRef.current = null;
     };
-  }, [syncSelectedSource]);
+  }, [loadInfrastructure, syncSelectedPoint]);
 
   useEffect(() => {
-    if (mapRef.current?.isStyleLoaded()) {
-      loadAssets();
+    if (mapRef.current?.isStyleLoaded()) loadTransformers();
+  }, [branch, feeder, serviceArea, loadTransformers]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map?.isStyleLoaded()) return;
+
+    const visibility = (value: boolean) => (value ? "visible" : "none");
+    for (const id of TRANSFORMER_LAYERS) {
+      if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", visibility(layers.transformers));
     }
-  }, [branch, feeder, serviceArea, loadAssets]);
-
-  const handleServiceAreaChange = (value: string) => {
-    setServiceArea(value);
-    setBranch("");
-    setFeeder("");
-    setSearchQuery("");
-    setSearchInput("");
-    setSelected(null);
-    syncSelectedSource(null);
-  };
-
-  const handleBranchChange = (value: string) => {
-    setBranch(value);
-    setFeeder("");
-    setSearchQuery("");
-    setSearchInput("");
-    setSelected(null);
-    syncSelectedSource(null);
-  };
-
-  const handleFeederChange = (value: string) => {
-    setFeeder(value);
-    setSearchQuery("");
-    setSearchInput("");
-    setSelected(null);
-    syncSelectedSource(null);
-  };
+    for (const id of STATION_LAYERS) {
+      if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", visibility(layers.stations));
+    }
+    for (const id of NETWORK_LAYERS) {
+      if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", visibility(layers.network));
+    }
+  }, [layers]);
 
   const resetFilters = () => {
     setServiceArea("");
@@ -422,7 +531,7 @@ export default function HomePage() {
     setSearchInput("");
     setSearchQuery("");
     setSelected(null);
-    syncSelectedSource(null);
+    syncSelectedPoint(null);
   };
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
@@ -431,19 +540,16 @@ export default function HomePage() {
     if (query.length < 2) return;
     setSearchQuery(query);
     setSelected(null);
-    syncSelectedSource(null);
-  };
-
-  const clearSearch = () => {
-    setSearchInput("");
-    setSearchQuery("");
-    setSelected(null);
-    syncSelectedSource(null);
+    syncSelectedPoint(null);
   };
 
   const closeDetails = () => {
     setSelected(null);
-    syncSelectedSource(null);
+    syncSelectedPoint(null);
+  };
+
+  const toggleLayer = (key: keyof LayerVisibility) => {
+    setLayers((current) => ({ ...current, [key]: !current[key] }));
   };
 
   return (
@@ -451,9 +557,7 @@ export default function HomePage() {
       <aside className="sidebar">
         <div>
           <div className="brand-row">
-            <div className="brand-mark">
-              <Layers3 size={21} />
-            </div>
+            <div className="brand-mark"><Layers3 size={21} /></div>
             <div>
               <p className="eyebrow">GeoAsset Kenya</p>
               <h1>Grid Asset Explorer</h1>
@@ -461,20 +565,14 @@ export default function HomePage() {
           </div>
 
           <p className="intro">
-            Explore real public electricity infrastructure data through a spatial
-            asset-management interface.
+            Explore public electricity infrastructure through a spatial asset-management interface.
           </p>
 
           <div className="status-card">
-            <div className="status-icon">
-              <Activity size={17} />
-            </div>
+            <div className="status-icon"><Activity size={17} /></div>
             <div>
               <strong>{message}</strong>
-              <span>
-                {visibleCount.toLocaleString()} transformer
-                {visibleCount === 1 ? "" : "s"} returned
-              </span>
+              <span>{visibleCount.toLocaleString()} transformers returned</span>
             </div>
             {loading && <RefreshCw size={16} className="spin" />}
           </div>
@@ -488,91 +586,80 @@ export default function HomePage() {
               aria-label="Search transformer assets"
             />
             {searchQuery && (
-              <button
-                type="button"
-                onClick={clearSearch}
-                className="search-clear"
-                aria-label="Clear search"
-              >
+              <button type="button" onClick={() => { setSearchInput(""); setSearchQuery(""); }} className="search-clear" aria-label="Clear search">
                 <X size={14} />
               </button>
             )}
           </form>
 
-          <section className="filter-section">
-            <div className="section-title">
-              <Filter size={15} />
-              <span>Map filters</span>
+          <section className="layer-section">
+            <div className="section-title"><Layers3 size={15} /><span>Map layers</span></div>
+            <LayerToggle
+              label="Distribution transformers"
+              detail="57,360 assets"
+              active={layers.transformers}
+              swatch="transformer"
+              onClick={() => toggleLayer("transformers")}
+            />
+            <LayerToggle
+              label="Transmission stations"
+              detail={`${stationCount || 83} stations`}
+              active={layers.stations}
+              swatch="station"
+              onClick={() => toggleLayer("stations")}
+            />
+            <LayerToggle
+              label="Transmission network"
+              detail={`${networkCount || 346} line features`}
+              active={layers.network}
+              swatch="network"
+              onClick={() => toggleLayer("network")}
+            />
+            <div className="network-legend">
+              <span><i className="line-66" />66 kV</span>
+              <span><i className="line-132" />132 kV</span>
+              <span><i className="line-220" />220 kV</span>
             </div>
+          </section>
+
+          <section className="filter-section">
+            <div className="section-title"><Filter size={15} /><span>Transformer filters</span></div>
 
             <label>
               Service area
-              <select
-                value={serviceArea}
-                onChange={(event) => handleServiceAreaChange(event.target.value)}
-              >
+              <select value={serviceArea} onChange={(e) => { setServiceArea(e.target.value); setBranch(""); setFeeder(""); }}>
                 <option value="">All service areas</option>
-                {filterOptions.service_areas.map((item) => (
-                  <option value={item} key={item}>
-                    {item}
-                  </option>
-                ))}
+                {filterOptions.service_areas.map((item) => <option value={item} key={item}>{item}</option>)}
               </select>
             </label>
 
             <label>
               Branch
-              <select
-                value={branch}
-                onChange={(event) => handleBranchChange(event.target.value)}
-                disabled={!serviceArea && filterOptions.branches.length === 0}
-              >
+              <select value={branch} onChange={(e) => { setBranch(e.target.value); setFeeder(""); }}>
                 <option value="">All branches</option>
-                {filterOptions.branches.map((item) => (
-                  <option value={item} key={item}>
-                    {item}
-                  </option>
-                ))}
+                {filterOptions.branches.map((item) => <option value={item} key={item}>{item}</option>)}
               </select>
             </label>
 
             <label>
               Feeder
-              <select
-                value={feeder}
-                onChange={(event) => handleFeederChange(event.target.value)}
-              >
+              <select value={feeder} onChange={(e) => setFeeder(e.target.value)}>
                 <option value="">All feeders</option>
-                {filterOptions.feeders.map((item) => (
-                  <option value={item} key={item}>
-                    {item}
-                  </option>
-                ))}
+                {filterOptions.feeders.map((item) => <option value={item} key={item}>{item}</option>)}
               </select>
             </label>
 
-            <button className="secondary-button" onClick={resetFilters} type="button">
-              Clear filters
-            </button>
+            <button className="secondary-button" onClick={resetFilters} type="button">Clear filters</button>
           </section>
 
           <section className="metric-grid">
-            <div className="metric-card">
-              <Database size={16} />
-              <strong>57,360</strong>
-              <span>loaded assets</span>
-            </div>
-            <div className="metric-card">
-              <MapPin size={16} />
-              <strong>PostGIS</strong>
-              <span>spatial backend</span>
-            </div>
+            <div className="metric-card"><Database size={16} /><strong>57,443</strong><span>point assets</span></div>
+            <div className="metric-card"><Zap size={16} /><strong>{networkCount || 346}</strong><span>network lines</span></div>
           </section>
         </div>
 
         <div className="source-note">
-          Infrastructure source: ENERGYDATA.INFO / World Bank Group, attributed
-          on the portal to KPLC. Operational condition fields remain demo-only.
+          Public infrastructure sources: ENERGYDATA.INFO / World Bank Group. Operational condition fields remain demo-only.
         </div>
       </aside>
 
@@ -580,92 +667,100 @@ export default function HomePage() {
         <div ref={mapContainer} className="map" />
 
         <div className="map-topbar">
-          <div>
-            <span className="live-dot" />
-            Distribution transformers
-          </div>
-          <div className="map-topbar-meta">
-            <LocateFixed size={13} />
-            <span>{searchQuery ? "Search mode" : "Viewport query"}</span>
-          </div>
+          <div><span className="live-dot" />Kenya electricity infrastructure</div>
+          <div className="map-topbar-meta"><LocateFixed size={13} /><span>{searchQuery ? "Search mode" : "Viewport query"}</span></div>
         </div>
 
-        {selected && (
-          <aside className="detail-drawer">
-            <button
-              className="close-button"
-              onClick={closeDetails}
-              aria-label="Close asset details"
-            >
-              <X size={18} />
-            </button>
-
-            <p className="eyebrow">Transformer asset</p>
-            <h2>
-              {selected.properties.asset_reference ||
-                `Asset ${selected.properties.source_id ?? ""}`}
-            </h2>
-
-            <div className="coordinate-row">
-              {selected.geometry.coordinates[1].toFixed(5)},{" "}
-              {selected.geometry.coordinates[0].toFixed(5)}
-            </div>
-
-            <div className="asset-summary">
-              <span>{selected.properties.service_area || "Service area unavailable"}</span>
-              <span>{selected.properties.branch || "Branch unavailable"}</span>
-            </div>
-
-            <dl>
-              <Detail label="Feeder" value={selected.properties.feeder} />
-              <Detail label="Structure" value={selected.properties.asset_structure} />
-              <Detail
-                label="Environment"
-                value={selected.properties.installation_environment}
-              />
-              <Detail label="Isolation" value={selected.properties.isolation_type} />
-              <Detail
-                label="Road"
-                value={
-                  selected.properties.road_name || selected.properties.street_name
-                }
-              />
-              <Detail
-                label="Location"
-                value={selected.properties.location_description}
-              />
-            </dl>
-
-            <div className="provenance">
-              <strong>Data provenance</strong>
-              <span>
-                {selected.properties.source_name ??
-                  "Public infrastructure dataset"}
-              </span>
-              <span>
-                License:{" "}
-                {selected.properties.source_license ??
-                  "See repository documentation"}
-              </span>
-            </div>
-          </aside>
-        )}
+        {selected && <DetailDrawer selected={selected} onClose={closeDetails} />}
       </section>
     </main>
   );
 }
 
-function Detail({
+function LayerToggle({
   label,
-  value
+  detail,
+  active,
+  swatch,
+  onClick
 }: {
   label: string;
-  value?: string | null;
+  detail: string;
+  active: boolean;
+  swatch: string;
+  onClick: () => void;
 }) {
   return (
-    <div>
-      <dt>{label}</dt>
-      <dd>{value || "Not provided"}</dd>
-    </div>
+    <button type="button" className={`layer-toggle ${active ? "active" : ""}`} onClick={onClick}>
+      <span className={`layer-swatch ${swatch}`} />
+      <span className="layer-copy"><strong>{label}</strong><small>{detail}</small></span>
+      <span className="layer-state">{active ? "On" : "Off"}</span>
+    </button>
   );
+}
+
+function DetailDrawer({
+  selected,
+  onClose
+}: {
+  selected: Exclude<SelectedItem, null>;
+  onClose: () => void;
+}) {
+  if (selected.kind === "network") {
+    const p = selected.feature.properties;
+    return (
+      <aside className="detail-drawer">
+        <button className="close-button" onClick={onClose} aria-label="Close details"><X size={18} /></button>
+        <p className="eyebrow">Transmission network</p>
+        <h2>{p.network_class || "Network segment"}</h2>
+        <div className="asset-summary">
+          <span>{p.voltage_kv ? `${p.voltage_kv} kV` : "Voltage not provided"}</span>
+        </div>
+        <dl>
+          <Detail label="Name" value={p.name} />
+          <Detail label="Source ID" value={p.source_id} />
+        </dl>
+        <div className="provenance">
+          <strong>Data provenance</strong>
+          <span>{p.source_name || "Public electricity network dataset"}</span>
+          <span>License: {p.source_license || "See repository documentation"}</span>
+        </div>
+      </aside>
+    );
+  }
+
+  const feature = selected.feature;
+  const p = feature.properties;
+  const isStation = p.asset_type === "transmission_station" || p.asset_type_name === "Transmission Station";
+
+  return (
+    <aside className="detail-drawer">
+      <button className="close-button" onClick={onClose} aria-label="Close details"><X size={18} /></button>
+      <p className="eyebrow">{isStation ? "Transmission station" : "Transformer asset"}</p>
+      <h2>{p.name || p.asset_reference || `Asset ${p.source_id ?? ""}`}</h2>
+      <div className="coordinate-row">
+        {feature.geometry.coordinates[1].toFixed(5)}, {feature.geometry.coordinates[0].toFixed(5)}
+      </div>
+      <div className="asset-summary">
+        {p.voltage_kv && <span>{p.voltage_kv} kV</span>}
+        <span>{p.service_area || "Service area unavailable"}</span>
+        <span>{p.branch || "Branch unavailable"}</span>
+      </div>
+      <dl>
+        {!isStation && <Detail label="Feeder" value={p.feeder} />}
+        {!isStation && <Detail label="Structure" value={p.asset_structure} />}
+        <Detail label="Road" value={p.road_name || p.street_name} />
+        <Detail label="Location" value={p.location_description} />
+      </dl>
+      <div className="provenance">
+        <strong>Data provenance</strong>
+        <span>{p.source_name || "Public infrastructure dataset"}</span>
+        <span>License: {p.source_license || "See repository documentation"}</span>
+      </div>
+    </aside>
+  );
+}
+
+function Detail({ label, value }: { label: string; value?: string | null }) {
+  return <div><dt>{label}</dt><dd>{value || "Not provided"}</dd></div>;
 }
