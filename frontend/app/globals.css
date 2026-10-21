@@ -1191,3 +1191,13 @@ select:disabled {
 .condition-fair { color: #eab308; }
 .condition-poor { color: #f97316; }
 .condition-critical { color: #ef4444; }
+
+
+.demo-filter-section {
+  padding-top: 18px;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+}
+
+.demo-filter-section .section-title {
+  color: #a5f3fc;
+}
