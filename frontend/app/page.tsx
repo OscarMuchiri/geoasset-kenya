@@ -552,11 +552,12 @@ export default function HomePage() {
         type: "circle",
         source: "selected-asset",
         paint: {
-          "circle-radius": 12,
+          "circle-radius": 16,
           "circle-color": "#ffffff",
-          "circle-opacity": 0.08,
-          "circle-stroke-width": 3,
-          "circle-stroke-color": "#f8fafc"
+          "circle-opacity": 0,
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#f8fafc",
+          "circle-stroke-opacity": 0.78
         }
       });
 
