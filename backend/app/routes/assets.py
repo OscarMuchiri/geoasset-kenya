@@ -240,6 +240,61 @@ def get_filter_options(
     }
 
 
+@router.get("/bounds")
+def get_asset_bounds(
+    asset_type: str = "distribution_transformer",
+    service_area: str | None = None,
+    branch: str | None = None,
+    feeder: str | None = None,
+    db: Session = Depends(get_db),
+) -> dict:
+    clauses = ["at.code = :asset_type"]
+    params: dict[str, object] = {"asset_type": asset_type}
+
+    if service_area:
+        clauses.append("a.service_area = :service_area")
+        params["service_area"] = service_area
+
+    if branch:
+        clauses.append("a.branch = :branch")
+        params["branch"] = branch
+
+    if feeder:
+        clauses.append("a.feeder = :feeder")
+        params["feeder"] = feeder
+
+    row = db.execute(
+        text(
+            """
+            SELECT
+                ST_XMin(extent) AS min_lon,
+                ST_YMin(extent) AS min_lat,
+                ST_XMax(extent) AS max_lon,
+                ST_YMax(extent) AS max_lat
+            FROM (
+                SELECT ST_Extent(a.geom) AS extent
+                FROM assets a
+                JOIN asset_types at ON at.id = a.asset_type_id
+                WHERE """
+            + " AND ".join(clauses)
+            + """
+            ) scoped
+            """
+        ),
+        params,
+    ).mappings().one()
+
+    if row["min_lon"] is None:
+        raise HTTPException(status_code=404, detail="No assets found for this scope.")
+
+    return {
+        "min_lon": float(row["min_lon"]),
+        "min_lat": float(row["min_lat"]),
+        "max_lon": float(row["max_lon"]),
+        "max_lat": float(row["max_lat"]),
+    }
+
+
 @router.get("/{asset_id}")
 def get_asset(asset_id: UUID, db: Session = Depends(get_db)) -> dict:
     query = text(BASE_SELECT + " WHERE a.id = :asset_id")
