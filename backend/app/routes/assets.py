@@ -134,6 +134,8 @@ def list_assets(
                 "coordinates": [row["longitude"], row["latitude"]],
             },
             "properties": {
+                "asset_id": row["id"],
+                **{
                 key: row[key]
                 for key in (
                     "source_id",
@@ -161,6 +163,7 @@ def list_assets(
                     "source_license",
                     "source_properties",
                 )
+                }
             },
         }
         for row in rows
@@ -311,6 +314,8 @@ def get_asset(asset_id: UUID, db: Session = Depends(get_db)) -> dict:
             "coordinates": [row["longitude"], row["latitude"]],
         },
         "properties": {
+            "asset_id": row["id"],
+            **{
             key: row[key]
             for key in (
                 "source_id",
@@ -338,5 +343,6 @@ def get_asset(asset_id: UUID, db: Session = Depends(get_db)) -> dict:
                 "source_license",
                 "source_properties",
             )
+            }
         },
     }
