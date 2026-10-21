@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import maplibregl, { GeoJSONSource, Map as MapLibreMap } from "maplibre-gl";
 import {
   Activity,
+  BarChart3,
   Database,
   Filter,
   Layers3,
@@ -23,18 +24,25 @@ type FeatureProperties = {
   asset_type_name?: string | null;
   name?: string | null;
   voltage_kv?: number | null;
+  region?: string | null;
   service_area?: string | null;
   branch?: string | null;
   feeder?: string | null;
   asset_reference?: string | null;
   asset_structure?: string | null;
+  dcs_category?: string | null;
+  origin_area?: string | null;
   installation_environment?: string | null;
   isolation_type?: string | null;
   road_name?: string | null;
   street_name?: string | null;
   location_description?: string | null;
+  status?: string | null;
+  condition?: string | null;
+  maintenance_priority?: string | null;
   source_name?: string | null;
   source_license?: string | null;
+  source_properties?: Record<string, unknown> | null;
 };
 
 type AssetFeature = GeoJSON.Feature<GeoJSON.Point, FeatureProperties>;
@@ -46,6 +54,7 @@ type NetworkProperties = {
   network_class?: string | null;
   source_name?: string | null;
   source_license?: string | null;
+  source_properties?: Record<string, unknown> | null;
 };
 
 type NetworkFeature = GeoJSON.Feature<
@@ -62,6 +71,30 @@ type FilterOptions = {
   service_areas: string[];
   branches: string[];
   feeders: string[];
+};
+
+
+type AnalyticsSummary = {
+  transformers: {
+    total: number;
+    scope_count: number;
+    service_areas: number;
+    branches: number;
+    feeders: number;
+  };
+  stations: { total: number };
+  network: {
+    feature_count: number;
+    length_km: number;
+    classes: Array<{
+      network_class: string;
+      voltage_kv: number | null;
+      feature_count: number;
+      length_km: number;
+    }>;
+  };
+  top_service_areas: Array<{ label: string; value: number }>;
+  top_branches: Array<{ label: string; value: number }>;
 };
 
 type LayerVisibility = {
@@ -115,6 +148,8 @@ export default function HomePage() {
   const [networkCount, setNetworkCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("Loading infrastructure…");
+  const [analytics, setAnalytics] = useState<AnalyticsSummary | null>(null);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const [layers, setLayers] = useState<LayerVisibility>({
     transformers: true,
     stations: true,
@@ -129,6 +164,17 @@ export default function HomePage() {
       feature
         ? { type: "FeatureCollection", features: [feature] }
         : emptyPoints
+    );
+  }, []);
+
+  const syncSelectedLine = useCallback((feature: NetworkFeature | null) => {
+    const map = mapRef.current;
+    if (!map) return;
+    const source = map.getSource("selected-network") as GeoJSONSource | undefined;
+    source?.setData(
+      feature
+        ? { type: "FeatureCollection", features: [feature] }
+        : emptyLines
     );
   }, []);
 
@@ -281,6 +327,21 @@ export default function HomePage() {
   }, [branch, serviceArea]);
 
   useEffect(() => {
+    const params = new URLSearchParams();
+    if (serviceArea) params.set("service_area", serviceArea);
+    if (branch) params.set("branch", branch);
+    if (feeder) params.set("feeder", feeder);
+
+    fetch(`${API_URL}/analytics/summary?${params.toString()}`)
+      .then((response) => {
+        if (!response.ok) throw new Error("Analytics request failed");
+        return response.json();
+      })
+      .then((data) => setAnalytics(data))
+      .catch((error) => console.error("Could not load analytics", error));
+  }, [branch, feeder, serviceArea]);
+
+  useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
 
     const map = new maplibregl.Map({
@@ -336,6 +397,7 @@ export default function HomePage() {
       });
       map.addSource("stations", { type: "geojson", data: emptyPoints });
       map.addSource("selected-asset", { type: "geojson", data: emptyPoints });
+      map.addSource("selected-network", { type: "geojson", data: emptyLines });
 
       map.addLayer({
         id: "network-lines",
@@ -370,6 +432,18 @@ export default function HomePage() {
           "line-color": "#ffffff",
           "line-width": 8,
           "line-opacity": 0
+        }
+      });
+
+      map.addLayer({
+        id: "selected-network-line",
+        type: "line",
+        source: "selected-network",
+        paint: {
+          "line-color": "#f8fafc",
+          "line-width": 7,
+          "line-opacity": 0.78,
+          "line-blur": 0.35
         }
       });
 
@@ -505,21 +579,27 @@ export default function HomePage() {
       const feature = event.features?.[0] as unknown as AssetFeature | undefined;
       if (!feature) return;
       setSelected({ kind: "asset", feature });
+      setAnalyticsOpen(false);
       syncSelectedPoint(feature);
+      syncSelectedLine(null);
     });
 
     map.on("click", "station-points", (event) => {
       const feature = event.features?.[0] as unknown as AssetFeature | undefined;
       if (!feature) return;
       setSelected({ kind: "asset", feature });
+      setAnalyticsOpen(false);
       syncSelectedPoint(feature);
+      syncSelectedLine(null);
     });
 
     map.on("click", "network-lines", (event) => {
       const feature = event.features?.[0] as unknown as NetworkFeature | undefined;
       if (!feature) return;
       setSelected({ kind: "network", feature });
+      setAnalyticsOpen(false);
       syncSelectedPoint(null);
+      syncSelectedLine(feature);
     });
 
     for (const layer of ["clusters", "transformer-points", "station-points", "network-lines"]) {
@@ -535,7 +615,7 @@ export default function HomePage() {
       map.remove();
       mapRef.current = null;
     };
-  }, [loadInfrastructure, syncSelectedPoint]);
+  }, [loadInfrastructure, syncSelectedLine, syncSelectedPoint]);
 
   useEffect(() => {
     if (mapRef.current?.isStyleLoaded()) loadTransformers();
@@ -565,6 +645,7 @@ export default function HomePage() {
     setSearchQuery("");
     setSelected(null);
     syncSelectedPoint(null);
+    syncSelectedLine(null);
   };
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
@@ -574,11 +655,13 @@ export default function HomePage() {
     setSearchQuery(query);
     setSelected(null);
     syncSelectedPoint(null);
+    syncSelectedLine(null);
   };
 
   const closeDetails = () => {
     setSelected(null);
     syncSelectedPoint(null);
+    syncSelectedLine(null);
   };
 
   const toggleLayer = (key: keyof LayerVisibility) => {
@@ -701,12 +784,141 @@ export default function HomePage() {
 
         <div className="map-topbar">
           <div><span className="live-dot" />Kenya electricity infrastructure</div>
-          <div className="map-topbar-meta"><LocateFixed size={13} /><span>{searchQuery ? "Search mode" : "Viewport query"}</span></div>
+          <div className="map-topbar-actions">
+            <button
+              type="button"
+              className={`topbar-action ${analyticsOpen ? "active" : ""}`}
+              onClick={() => {
+                setSelected(null);
+                syncSelectedPoint(null);
+                syncSelectedLine(null);
+                setAnalyticsOpen((open) => !open);
+              }}
+            >
+              <BarChart3 size={13} />
+              Analytics
+            </button>
+            <div className="map-topbar-meta"><LocateFixed size={13} /><span>{searchQuery ? "Search mode" : "Viewport query"}</span></div>
+          </div>
         </div>
+
+        {!selected && analyticsOpen && analytics && (
+          <AnalyticsPanel
+            analytics={analytics}
+            serviceArea={serviceArea}
+            branch={branch}
+            feeder={feeder}
+            onClose={() => setAnalyticsOpen(false)}
+          />
+        )}
 
         {selected && <DetailDrawer selected={selected} onClose={closeDetails} />}
       </section>
     </main>
+  );
+}
+
+function AnalyticsPanel({
+  analytics,
+  serviceArea,
+  branch,
+  feeder,
+  onClose
+}: {
+  analytics: AnalyticsSummary;
+  serviceArea: string;
+  branch: string;
+  feeder: string;
+  onClose: () => void;
+}) {
+  const maxArea = Math.max(...analytics.top_service_areas.map((item) => item.value), 1);
+  const maxBranch = Math.max(...analytics.top_branches.map((item) => item.value), 1);
+  const scopeLabel = feeder || branch || serviceArea || "All transformers";
+
+  return (
+    <aside className="analytics-panel">
+      <button className="close-button" onClick={onClose} aria-label="Close analytics"><X size={18} /></button>
+      <p className="eyebrow">Infrastructure analytics</p>
+      <h2>System snapshot</h2>
+      <p className="analytics-scope">{scopeLabel}</p>
+
+      <div className="analytics-kpis">
+        <AnalyticsKpi label="Transformer scope" value={analytics.transformers.scope_count.toLocaleString()} />
+        <AnalyticsKpi label="Stations" value={analytics.stations.total.toLocaleString()} />
+        <AnalyticsKpi label="Network segments" value={analytics.network.feature_count.toLocaleString()} />
+        <AnalyticsKpi label="Network length" value={`${analytics.network.length_km.toLocaleString()} km`} />
+      </div>
+
+      <div className="analytics-footprint">
+        <span><strong>{analytics.transformers.service_areas}</strong> service areas</span>
+        <span><strong>{analytics.transformers.branches}</strong> branches</span>
+        <span><strong>{analytics.transformers.feeders}</strong> feeders</span>
+      </div>
+
+      <section className="analytics-section">
+        <h3>Transmission network</h3>
+        {analytics.network.classes.map((item) => (
+          <div className="voltage-row" key={item.network_class}>
+            <span className={`voltage-line voltage-${item.network_class.replace("kV", "")}`} />
+            <div>
+              <strong>{item.network_class}</strong>
+              <small>{item.feature_count} segments</small>
+            </div>
+            <b>{item.length_km.toLocaleString()} km</b>
+          </div>
+        ))}
+      </section>
+
+      <AnalyticsRanking
+        title="Largest service areas"
+        items={analytics.top_service_areas}
+        maxValue={maxArea}
+      />
+
+      <AnalyticsRanking
+        title={serviceArea ? "Largest branches in scope" : "Largest branches"}
+        items={analytics.top_branches}
+        maxValue={maxBranch}
+      />
+    </aside>
+  );
+}
+
+function AnalyticsKpi({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="analytics-kpi">
+      <strong>{value}</strong>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function AnalyticsRanking({
+  title,
+  items,
+  maxValue
+}: {
+  title: string;
+  items: Array<{ label: string; value: number }>;
+  maxValue: number;
+}) {
+  return (
+    <section className="analytics-section">
+      <h3>{title}</h3>
+      <div className="ranking-list">
+        {items.map((item) => (
+          <div className="ranking-row" key={item.label}>
+            <div className="ranking-heading">
+              <span>{item.label}</span>
+              <strong>{item.value.toLocaleString()}</strong>
+            </div>
+            <div className="ranking-track">
+              <i style={{ width: `${Math.max(4, (item.value / maxValue) * 100)}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -751,6 +963,10 @@ function DetailDrawer({
         </div>
         <dl>
           <Detail label="Name" value={p.name} />
+          <Detail label="Feeder" value={rawText(p.source_properties, ["Feeder_o10", "Feeder_o17"])} />
+          <Detail label="Branch" value={rawText(p.source_properties, ["Branch3"])} />
+          <Detail label="County / area" value={rawText(p.source_properties, ["County2"])} />
+          <Detail label="Length" value={withUnit(rawText(p.source_properties, ["Length_km"]), " km")} />
           <Detail label="Source ID" value={p.source_id} />
         </dl>
         <div className="provenance">
@@ -780,10 +996,15 @@ function DetailDrawer({
         <span>{p.branch || "Branch unavailable"}</span>
       </div>
       <dl>
+        {isStation && <Detail label="Region" value={p.region} />}
+        {isStation && <Detail label="Ownership" value={rawText(p.source_properties, ["Ownership23"])} />}
         {!isStation && <Detail label="Feeder" value={p.feeder} />}
         {!isStation && <Detail label="Structure" value={p.asset_structure} />}
+        {!isStation && <Detail label="DCS category" value={p.dcs_category} />}
         <Detail label="Road" value={p.road_name || p.street_name} />
         <Detail label="Location" value={p.location_description} />
+        <Detail label="Status" value={p.status} />
+        <Detail label="Condition" value={p.condition} />
       </dl>
       <div className="provenance">
         <strong>Data provenance</strong>
@@ -792,6 +1013,24 @@ function DetailDrawer({
       </div>
     </aside>
   );
+}
+
+function rawText(
+  source: Record<string, unknown> | null | undefined,
+  keys: string[]
+): string | null {
+  if (!source) return null;
+  for (const key of keys) {
+    const value = source[key];
+    if (value !== undefined && value !== null && String(value).trim()) {
+      return String(value).trim();
+    }
+  }
+  return null;
+}
+
+function withUnit(value: string | null, unit: string): string | null {
+  return value ? `${value}${unit}` : null;
 }
 
 function Detail({ label, value }: { label: string; value?: string | null }) {
