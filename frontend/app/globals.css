@@ -873,3 +873,27 @@ select:disabled {
     max-height: calc(100vh - 84px);
   }
 }
+
+
+.ranking-row {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  background: transparent;
+  transition: transform 150ms ease;
+}
+
+.ranking-row:hover {
+  transform: translateX(3px);
+}
+
+.ranking-row:hover .ranking-heading span {
+  color: #a5f3fc;
+}
+
+.ranking-row:hover .ranking-track {
+  background: rgba(34, 211, 238, 0.1);
+}
