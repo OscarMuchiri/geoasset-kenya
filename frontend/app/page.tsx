@@ -123,9 +123,10 @@ const TRANSFORMER_LAYERS = [
   "clusters",
   "cluster-count",
   "transformer-halo",
+  "transformer-condition-ring",
   "transformer-points"
 ];
-const STATION_LAYERS = ["station-halo", "station-points"];
+const STATION_LAYERS = ["station-halo", "station-condition-ring", "station-points"];
 const NETWORK_LAYERS = ["network-lines", "network-lines-highlight"];
 
 export default function HomePage() {
@@ -820,6 +821,13 @@ export default function HomePage() {
               <span><i className="line-66" />66 kV</span>
               <span><i className="line-132" />132 kV</span>
               <span><i className="line-220" />220 kV</span>
+            </div>
+            <div className="condition-legend" aria-label="Demo operational condition legend">
+              <span className="condition-legend-title">Demo condition</span>
+              <span><i className="condition-good" />Good</span>
+              <span><i className="condition-fair" />Fair</span>
+              <span><i className="condition-poor" />Poor</span>
+              <span><i className="condition-critical" />Critical</span>
             </div>
           </section>
 
