@@ -62,7 +62,9 @@ def main() -> None:
     else:
         gdf = gdf.to_crs(4326)
 
-    valid_geometry = gdf.geometry.notna() & ~gdf.geometry.is_empty
+    valid_geometry = gdf.geometry.apply(
+        lambda geom: geom is not None and not geom.is_empty
+    )
     gdf = gdf[
         valid_geometry
         & gdf.geometry.geom_type.isin(["LineString", "MultiLineString"])
