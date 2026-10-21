@@ -72,19 +72,21 @@ VOLTAGE_CANDIDATES = (
 )
 
 FIELD_MAP = {
-    "region": "RCC1",
-    "service_area": "County2",
-    "branch": "Branch3",
-    "asset_reference": "Modifyin25",
-    "feeder": "Feeder_028",
-    "origin_area": "Origin_027",
-    "asset_structure": "Substati9",
-    "dcs_category": "DCS_Cate15",
-    "installation_environment": "Substati29",
-    "isolation_type": "HT_Isola32",
-    "road_name": "Road",
-    "street_name": "Road_Str38",
-    "location_description": "Physical39",
+    "region": ("RCC1",),
+    "service_area": ("County2",),
+    "branch": ("Branch3",),
+    "asset_reference": ("Modifyin25",),
+    # The source schema uses the letter "o" in these field names, not zero.
+    # Keep the older zero variants as fallbacks for resilience to schema copies.
+    "feeder": ("Feeder_o28", "Feeder_028"),
+    "origin_area": ("Origin_o27", "Origin_027"),
+    "asset_structure": ("Substati9",),
+    "dcs_category": ("DCS_Cate15",),
+    "installation_environment": ("Substati29",),
+    "isolation_type": ("HT_Isola32",),
+    "road_name": ("Road",),
+    "street_name": ("Road_Str38",),
+    "location_description": ("Physical39",),
 }
 
 
@@ -245,8 +247,8 @@ def normalize(gdf: gpd.GeoDataFrame) -> list[dict[str, Any]]:
         }
 
         normalized_fields = {
-            target: _string_or_none(properties.get(source))
-            for target, source in FIELD_MAP.items()
+            target: _string_or_none(first_value(properties, candidates))
+            for target, candidates in FIELD_MAP.items()
         }
 
         records.append(
