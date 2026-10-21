@@ -98,6 +98,7 @@ export default function HomePage() {
   const mapRef = useRef<MapLibreMap | null>(null);
   const loadTransformersRef = useRef<() => Promise<void>>(async () => {});
   const searchQueryRef = useRef("");
+  const infrastructureLoadedRef = useRef(false);
 
   const [selected, setSelected] = useState<SelectedItem>(null);
   const [serviceArea, setServiceArea] = useState("");
@@ -241,6 +242,19 @@ export default function HomePage() {
     loadTransformersRef.current = loadTransformers;
     searchQueryRef.current = searchQuery;
   }, [loadTransformers, searchQuery]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const map = mapRef.current;
+      if (!map || !map.isStyleLoaded() || infrastructureLoadedRef.current) return;
+
+      infrastructureLoadedRef.current = true;
+      void loadInfrastructure();
+      window.clearInterval(interval);
+    }, 300);
+
+    return () => window.clearInterval(interval);
+  }, [loadInfrastructure]);
 
   useEffect(() => {
     const params = new URLSearchParams();
