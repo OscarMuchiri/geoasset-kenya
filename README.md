@@ -93,6 +93,7 @@ geoasset-kenya/
 - [x] Load 66/132/220 kV electricity network layers into PostGIS
 - [x] Build FastAPI asset endpoints
 - [x] Build interactive MapLibre interface
+- [x] Add interactive infrastructure analytics and feature inspection
 - [ ] Add inspection and maintenance workflows
 - [ ] Add analytics and spatial-query tools
 - [ ] Deploy production application
