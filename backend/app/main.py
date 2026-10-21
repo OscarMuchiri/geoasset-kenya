@@ -6,12 +6,13 @@ from .db import engine
 from .routes.assets import router as assets_router
 from .routes.network import router as network_router
 from .routes.analytics import router as analytics_router
+from .routes.operations import router as operations_router
 
 
 app = FastAPI(
     title="GeoAsset Kenya API",
     description="Spatial API for Kenya electricity infrastructure asset management.",
-    version="0.3.0",
+    version="0.4.0",
 )
 
 app.add_middleware(
@@ -28,6 +29,7 @@ app.add_middleware(
 app.include_router(assets_router)
 app.include_router(network_router)
 app.include_router(analytics_router)
+app.include_router(operations_router)
 
 
 @app.get("/", tags=["system"])
