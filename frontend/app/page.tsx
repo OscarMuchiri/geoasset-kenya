@@ -367,9 +367,9 @@ export default function HomePage() {
         filter: ["has", "point_count"],
         paint: {
           "circle-color": "#22d3ee",
-          "circle-radius": ["step", ["get", "point_count"], 23, 100, 30, 750, 37],
-          "circle-opacity": 0.13,
-          "circle-blur": 0.28
+          "circle-radius": ["step", ["get", "point_count"], 18, 100, 24, 750, 30],
+          "circle-opacity": 0.08,
+          "circle-blur": 0.34
         }
       });
 
@@ -380,10 +380,10 @@ export default function HomePage() {
         filter: ["has", "point_count"],
         paint: {
           "circle-color": ["step", ["get", "point_count"], "#22d3ee", 100, "#0ea5e9", 750, "#2563eb"],
-          "circle-radius": ["step", ["get", "point_count"], 17, 100, 23, 750, 29],
-          "circle-opacity": 0.9,
-          "circle-stroke-width": 2,
-          "circle-stroke-color": "#083344"
+          "circle-radius": ["step", ["get", "point_count"], 13, 100, 18, 750, 23],
+          "circle-opacity": 0.7,
+          "circle-stroke-width": 1.5,
+          "circle-stroke-color": "#0f3b4c"
         }
       });
 
@@ -394,7 +394,7 @@ export default function HomePage() {
         filter: ["has", "point_count"],
         layout: {
           "text-field": ["get", "point_count_abbreviated"],
-          "text-size": 12,
+          "text-size": 10.5,
           "text-font": ["Open Sans Bold"]
         },
         paint: { "text-color": "#ecfeff" }
@@ -406,9 +406,9 @@ export default function HomePage() {
         source: "transformers",
         filter: ["!", ["has", "point_count"]],
         paint: {
-          "circle-radius": 9,
+          "circle-radius": 7,
           "circle-color": "#22d3ee",
-          "circle-opacity": 0.13
+          "circle-opacity": 0.07
         }
       });
 
@@ -418,11 +418,11 @@ export default function HomePage() {
         source: "transformers",
         filter: ["!", ["has", "point_count"]],
         paint: {
-          "circle-radius": 4.8,
+          "circle-radius": 3.8,
           "circle-color": "#67e8f9",
-          "circle-stroke-width": 1.5,
+          "circle-stroke-width": 1.2,
           "circle-stroke-color": "#082f49",
-          "circle-opacity": 0.98
+          "circle-opacity": 0.82
         }
       });
 
@@ -431,9 +431,9 @@ export default function HomePage() {
         type: "circle",
         source: "stations",
         paint: {
-          "circle-radius": 11,
-          "circle-color": "#fbbf24",
-          "circle-opacity": 0.14
+          "circle-radius": 13,
+          "circle-color": "#f59e0b",
+          "circle-opacity": 0.2
         }
       });
 
@@ -446,13 +446,13 @@ export default function HomePage() {
             "interpolate",
             ["linear"],
             ["coalesce", ["get", "voltage_kv"], 66],
-            66, 5.5,
-            132, 7,
-            220, 8.5
+            66, 6,
+            132, 7.5,
+            220, 9
           ],
-          "circle-color": "#fde68a",
-          "circle-stroke-width": 2,
-          "circle-stroke-color": "#92400e",
+          "circle-color": "#fff1b8",
+          "circle-stroke-width": 2.2,
+          "circle-stroke-color": "#b45309",
           "circle-opacity": 0.98
         }
       });
