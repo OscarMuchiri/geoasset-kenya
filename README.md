@@ -26,7 +26,7 @@ The first release will allow a user to:
 | Database | PostgreSQL + PostGIS |
 | ORM / spatial access | SQLAlchemy + GeoAlchemy2 |
 | Data processing | Python, GeoPandas, Shapely |
-| Deployment | Vercel + managed API/database hosting |
+| Deployment | Vercel (frontend), Render (API), Supabase (PostgreSQL/PostGIS) |
 | Containers | Docker Compose |
 
 ## Data
@@ -78,9 +78,17 @@ geoasset-kenya/
 └── README.md
 ```
 
+## Live deployment
+
+- **Frontend:** https://geoasset-kenya.vercel.app
+- **API:** https://geoasset-kenya-api.onrender.com
+- **Database:** Supabase PostgreSQL + PostGIS
+
+The public deployment is read-only for demo operational records. Inspection and maintenance write workflows remain available for controlled/local demonstrations.
+
 ## Current status
 
-**Production-ready portfolio build — deployment in progress**
+**Production deployment live**
 
 - [x] Project repository created
 - [x] Architecture selected
@@ -96,7 +104,7 @@ geoasset-kenya/
 - [x] Add interactive infrastructure analytics and feature inspection
 - [x] Add inspection and maintenance workflows
 - [x] Add analytics and spatial-query tools
-- [ ] Deploy production application
+- [x] Deploy production application
 
 ## Local development
 
