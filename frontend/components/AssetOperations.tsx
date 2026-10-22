@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+const DEMO_WRITES_ENABLED =
+  process.env.NEXT_PUBLIC_DEMO_WRITES_ENABLED !== "false";
 
 type OperationalState = {
   id: string;
@@ -227,19 +229,25 @@ export default function AssetOperations({
         <StatePill label="Priority" value={data.asset.maintenance_priority} />
       </div>
 
-      <div className="operations-actions">
-        <button type="button" onClick={() => setMode(mode === "state" ? null : "state")}>
-          <Save size={13} /> State
-        </button>
-        <button type="button" onClick={() => setMode(mode === "inspection" ? null : "inspection")}>
-          <ClipboardCheck size={13} /> Inspect
-        </button>
-        <button type="button" onClick={() => setMode(mode === "maintenance" ? null : "maintenance")}>
-          <Wrench size={13} /> Maintain
-        </button>
-      </div>
+      {DEMO_WRITES_ENABLED ? (
+        <div className="operations-actions">
+          <button type="button" onClick={() => setMode(mode === "state" ? null : "state")}>
+            <Save size={13} /> State
+          </button>
+          <button type="button" onClick={() => setMode(mode === "inspection" ? null : "inspection")}>
+            <ClipboardCheck size={13} /> Inspect
+          </button>
+          <button type="button" onClick={() => setMode(mode === "maintenance" ? null : "maintenance")}>
+            <Wrench size={13} /> Maintain
+          </button>
+        </div>
+      ) : (
+        <p className="operations-muted">
+          Public deployment is read-only. Demo inspection and maintenance history is shown below.
+        </p>
+      )}
 
-      {mode === "state" && (
+      {DEMO_WRITES_ENABLED && mode === "state" && (
         <form className="operations-form" onSubmit={saveState}>
           <label>
             Asset status
@@ -265,7 +273,7 @@ export default function AssetOperations({
         </form>
       )}
 
-      {mode === "inspection" && (
+      {DEMO_WRITES_ENABLED && mode === "inspection" && (
         <form className="operations-form" onSubmit={addInspection}>
           <label>
             Condition observed
@@ -303,7 +311,7 @@ export default function AssetOperations({
         </form>
       )}
 
-      {mode === "maintenance" && (
+      {DEMO_WRITES_ENABLED && mode === "maintenance" && (
         <form className="operations-form" onSubmit={addMaintenance}>
           <label>
             Maintenance type
