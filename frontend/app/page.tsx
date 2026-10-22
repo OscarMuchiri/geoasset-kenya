@@ -186,7 +186,7 @@ export default function HomePage() {
 
   const loadTransformers = useCallback(async () => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded()) return;
+    if (!map || !map.getSource("transformers")) return;
 
     const params = new URLSearchParams({
       asset_type: "distribution_transformer",
