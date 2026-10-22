@@ -1,28 +1,61 @@
 # Deployment
 
-GeoAsset Kenya uses a split deployment:
+GeoAsset Kenya uses a split production deployment:
 
 - **Frontend:** Vercel
 - **API:** Render
-- **Database:** Render PostgreSQL with PostGIS
+- **Database:** Supabase PostgreSQL + PostGIS
 
-The repository includes `render.yaml`, which defines the API and managed PostgreSQL service.
+## Production URLs
 
-## 1. Deploy the API and database on Render
+- Frontend: https://geoasset-kenya.vercel.app
+- API: https://geoasset-kenya-api.onrender.com
+- Health check: https://geoasset-kenya-api.onrender.com/health
 
-Create a new Render Blueprint from this repository and select the repository root.
+## 1. Database on Supabase
 
-Render will read `render.yaml` and create:
+The production database is hosted on Supabase with PostGIS enabled.
 
-- `geoasset-kenya-api`
-- `geoasset-kenya-db`
+Production data includes:
 
-The API start command initializes the database schema idempotently before starting Uvicorn.
+- 57,360 distribution transformers
+- 83 transmission stations
+- 346 network-line features
+- demo inspection and maintenance records
 
-After deployment, verify:
+The application backend connects through the Supabase Session Pooler on port 5432.
+
+All application tables in the public schema have Row Level Security enabled. No public Data API policies are defined because the browser does not access Supabase directly; all application reads go through FastAPI.
+
+## 2. API on Render
+
+The API is deployed as the Render web service `geoasset-kenya-api`.
+
+Required environment variables:
 
 ```text
-https://<your-api>.onrender.com/health
+DATABASE_URL=<Supabase Session Pooler URI>
+DEMO_WRITES_ENABLED=false
+CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+CORS_ORIGIN_REGEX=https://.*\.vercel\.app
+```
+
+Build command:
+
+```text
+pip install -r backend/requirements.txt
+```
+
+Start command:
+
+```text
+cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+```
+
+Verify:
+
+```text
+https://geoasset-kenya-api.onrender.com/health
 ```
 
 Expected response:
@@ -31,75 +64,51 @@ Expected response:
 {"status":"ok","database":"reachable"}
 ```
 
-## 2. Copy the local PostGIS data to Render
+## 3. Frontend on Vercel
 
-This preserves the currently loaded infrastructure data as well as demo inspection and maintenance records.
+The GitHub repository is imported into Vercel with:
 
-From the repository root on Windows Command Prompt:
+- Framework preset: **Next.js**
+- Root Directory: **frontend**
+
+Environment variables:
+
+```text
+NEXT_PUBLIC_API_URL=https://geoasset-kenya-api.onrender.com
+NEXT_PUBLIC_DEMO_WRITES_ENABLED=false
+```
+
+The public production deployment is intentionally read-only for demo operational records.
+
+## 4. Production checks
+
+Verify:
+
+1. the map loads;
+2. transformer clusters and points load;
+3. transmission stations load;
+4. 66/132/220 kV network layers load;
+5. service-area, branch, feeder and demo-state filters work;
+6. search works;
+7. analytics loads and ranking selections can focus the map;
+8. asset details and demo history load;
+9. public write controls are hidden;
+10. `/health` reports the database as reachable.
+
+## Data migration reference
+
+A local data-only PostgreSQL dump can be created with:
 
 ```bat
 docker compose exec -T db pg_dump -U geoasset -d geoasset --format=custom --data-only --no-owner --no-acl --table=asset_types --table=assets --table=network_lines --table=inspections --table=maintenance_records > geoasset-data.dump
 ```
 
-Copy the **External Database URL** from the Render database dashboard.
-
-Set it temporarily in Command Prompt:
-
-```bat
-set RENDER_DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE
-```
-
-Clear the empty production tables created during initialization:
-
-```bat
-docker run --rm postgres:16-alpine psql "%RENDER_DATABASE_URL%" -c "TRUNCATE maintenance_records, inspections, assets, network_lines, asset_types RESTART IDENTITY CASCADE;"
-```
-
-Restore the local data snapshot:
-
-```bat
-docker run --rm -i postgres:16-alpine pg_restore --no-owner --no-acl --data-only --dbname="%RENDER_DATABASE_URL%" < geoasset-data.dump
-```
-
-Verify counts:
-
-```bat
-docker run --rm postgres:16-alpine psql "%RENDER_DATABASE_URL%" -c "SELECT COUNT(*) AS assets FROM assets; SELECT COUNT(*) AS network_lines FROM network_lines;"
-```
-
-Do not commit `geoasset-data.dump`.
-
-## 3. Deploy the frontend on Vercel
-
-Import the GitHub repository into Vercel.
-
-Use:
-
-- Framework preset: **Next.js**
-- Root Directory: **frontend**
-
-Create this environment variable for Production and Preview:
-
-```text
-NEXT_PUBLIC_API_URL=https://<your-api>.onrender.com
-```
-
-Then deploy.
-
-## 4. Final production checks
-
-Verify:
-
-1. the map loads;
-2. transformer, station and transmission-line layers load;
-3. search and filters work;
-4. analytics opens and rankings filter the map;
-5. asset details load;
-6. demo inspection, maintenance and state updates save successfully;
-7. `/health` reports the database as reachable.
+The dump should not be committed to Git.
 
 ## Security and provenance
 
 Public infrastructure layers retain their documented source licensing.
 
 Operational status, condition, inspection and maintenance records are clearly marked as demonstration data and are not presented as official utility operational records.
+
+Database passwords and connection strings must remain in environment variables and must never be committed to the repository.
